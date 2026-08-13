@@ -1,3 +1,5 @@
+[English](README.en.md)
+
 # dsh-slack
 
 DSH（DeepSeek Harness）社区插件：让 agent 与 Slack 双向通信。
