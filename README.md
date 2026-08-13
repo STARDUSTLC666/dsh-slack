@@ -126,3 +126,9 @@ pnpm test      # 先 build，再用 node:test 跑 test/*.test.mjs
 ## License
 
 MIT
+
+## 相关插件
+
+- [dsh-calendar](https://github.com/STARDUSTLC666/dsh-calendar) — CalDAV 日历五件套
+- [dsh-slack](https://github.com/STARDUSTLC666/dsh-slack) — Slack 通知/收件箱
+- [dsh-email](https://github.com/STARDUSTLC666/dsh-email) — 邮件六件套 + Web 设置页

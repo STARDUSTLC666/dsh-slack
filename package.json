@@ -50,5 +50,6 @@
     "dsh-plugin",
     "deepseek-harness",
     "dsh"
-  ]
+  ],
+  "packageManager": "pnpm@11.7.0"
 }
