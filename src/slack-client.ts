@@ -89,3 +89,11 @@ export function assertText(text: unknown): string {
   }
   return text
 }
+
+/** 校验 thread_ts 参数：必须是待回复消息 ts 的非空字符串。 */
+export function assertThreadTs(thread_ts: unknown): string {
+  if (typeof thread_ts !== 'string' || thread_ts.trim() === '') {
+    throw new Error('thread_ts 参数错误：必须是待回复消息的 ts（来自 slack_inbox 返回的 ts）的非空字符串。')
+  }
+  return thread_ts.trim()
+}

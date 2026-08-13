@@ -10,17 +10,17 @@ function mockContext() {
   }
 }
 
-test('apply 注册两个工具', () => {
+test('apply 注册四个工具', () => {
   const ctx = mockContext()
   apply(ctx, { token: 'xoxb-test', defaultChannel: '#general' })
   const names = ctx.registered.map((t) => t.name).sort()
-  assert.deepEqual(names, ['slack_channels', 'slack_notify'])
+  assert.deepEqual(names, ['slack_channels', 'slack_inbox', 'slack_notify', 'slack_reply'])
 })
 
-test('apply 在配置缺失时不抛错（懒加载），仍注册两个工具', () => {
+test('apply 在配置缺失时不抛错（懒加载），仍注册四个工具', () => {
   const ctx = mockContext()
   assert.doesNotThrow(() => apply(ctx, undefined))
-  assert.equal(ctx.registered.length, 2)
+  assert.equal(ctx.registered.length, 4)
 })
 
 test('两个工具的 parameters 都是已编译的 object JSON Schema', () => {

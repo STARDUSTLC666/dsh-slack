@@ -1,24 +1,18 @@
-/**
- * 构建两个面向模型的工具：slack_notify、slack_channels。
- * 依赖通过 ToolDeps 注入（clientProvider / configProvider），测试可注入 fake client。
- */
-
 import { compileParameters } from './compile.js'
 import type { SlackConfig } from './config.js'
 import { resolveDefaultChannel } from './config.js'
 import type { ContentBlock, ToolDefinition, ToolOutputDefinition } from './types.js'
 import type { SlackClient } from './slack-client.js'
-import { assertChannel, assertText, mapSlackError } from './slack-client.js'
+import { assertChannel, assertText, assertThreadTs, mapSlackError } from './slack-client.js'
+import type { InboxMessage, InboxQueue } from './inbox.js'
 
 /** 工具构建的依赖注入点。 */
 export interface ToolDeps {
-  /** 返回一个 SlackClient；token 缺失时抛中文错误。 */
   clientProvider: () => SlackClient
-  /** 返回当前配置（供默认频道等解析）。 */
   configProvider: () => SlackConfig | undefined
+  inboxProvider: () => InboxQueue
 }
 
-/** slack_notify 的输出 schema（原始 JSON Schema，纯 JSON 无 undefined）。 */
 const NOTIFY_OUTPUT_SCHEMA = {
   type: 'object',
   properties: {
@@ -29,7 +23,6 @@ const NOTIFY_OUTPUT_SCHEMA = {
   additionalProperties: true,
 } as const
 
-/** slack_channels 的输出 schema。 */
 const CHANNELS_OUTPUT_SCHEMA = {
   type: 'object',
   properties: {
@@ -50,15 +43,41 @@ const CHANNELS_OUTPUT_SCHEMA = {
   additionalProperties: true,
 } as const
 
+const INBOX_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    messages: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          ts: { type: 'string' },
+          channel: { type: 'string' },
+          user: { type: 'string' },
+          text: { type: 'string' },
+        },
+        required: ['ts', 'channel', 'user', 'text'],
+        additionalProperties: true,
+      },
+    },
+  },
+  required: ['messages'],
+  additionalProperties: true,
+} as const
+
 function textBlock(text: string): ContentBlock {
   return { type: 'text', text }
 }
 
-/** 构建 slack_notify：向指定频道/线程发送 Markdown 文本，返回 ts。 */
+function clampLimit(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 10
+  return Math.min(50, Math.max(1, Math.trunc(value)))
+}
+
 export function buildNotifyTool(deps: ToolDeps): ToolDefinition {
   const defaultChannel = resolveDefaultChannel(deps.configProvider())
   const channelDescription = defaultChannel
-    ? `目标频道：频道名（如 #general）或频道 ID。未特别指定时可使用默认频道 ${defaultChannel}。`
+    ? '目标频道：频道名（如 #general）或频道 ID。未特别指定时可使用默认频道 ' + defaultChannel + '。'
     : '目标频道：频道名（如 #general）或频道 ID。'
 
   const parameters = compileParameters({
@@ -71,7 +90,7 @@ export function buildNotifyTool(deps: ToolDeps): ToolDefinition {
     schema: NOTIFY_OUTPUT_SCHEMA,
     render: (_args, value) => {
       const v = value as { ts: string; channel: string }
-      return [textBlock(`已发送到 ${v.channel}（消息 ts：${v.ts}）。`)]
+      return [textBlock('已发送到 ' + v.channel + '（消息 ts：' + v.ts + '）。')]
     },
   }
 
@@ -103,7 +122,6 @@ export function buildNotifyTool(deps: ToolDeps): ToolDefinition {
   }
 }
 
-/** 构建 slack_channels：列出机器人可见频道（conversations.list）。 */
 export function buildChannelsTool(deps: ToolDeps): ToolDefinition {
   const parameters = compileParameters({})
 
@@ -114,8 +132,8 @@ export function buildChannelsTool(deps: ToolDeps): ToolDefinition {
       if (v.channels.length === 0) {
         return [textBlock('机器人当前看不到任何频道（可能需要先把 App 加入频道）。')]
       }
-      const names = v.channels.map((c) => `#${c.name}`).join('、')
-      return [textBlock(`机器人可见频道（${v.channels.length} 个）：${names}。`)]
+      const names = v.channels.map((c) => '#' + c.name).join('、')
+      return [textBlock('机器人可见频道（' + v.channels.length + ' 个）：' + names + '。')]
     },
   }
 
@@ -130,6 +148,78 @@ export function buildChannelsTool(deps: ToolDeps): ToolDefinition {
       try {
         const channels = await client.listChannels()
         return { channels: channels.map((c) => ({ id: c.id, name: c.name })) }
+      } catch (error) {
+        throw new Error(mapSlackError(error))
+      }
+    },
+  }
+}
+
+export function buildInboxTool(deps: ToolDeps): ToolDefinition {
+  const parameters = compileParameters({
+    limit: { type: 'integer', description: '最多返回的消息数（默认 10，范围 1-50）。' },
+    markRead: { type: 'boolean', description: '为 true 时，返回后清空收件箱队列（标记已读）。' },
+  })
+
+  const output: ToolOutputDefinition = {
+    schema: INBOX_OUTPUT_SCHEMA,
+    render: (_args, value) => {
+      const v = value as { messages: InboxMessage[] }
+      if (v.messages.length === 0) {
+        return [textBlock('收件箱为空：尚未开启 Socket Mode（缺少 appToken），或暂未收到新的 Slack 消息。请确认已配置 appToken 并订阅 message.channels / message.im 事件。')]
+      }
+      const lines = v.messages.map((m) => '[' + m.channel + '] ' + m.user + '（ts: ' + m.ts + '）：' + m.text)
+      return [textBlock('收件箱（' + v.messages.length + ' 条，新的在前）：\n' + lines.join('\n'))]
+    },
+  }
+
+  return {
+    name: 'slack_inbox',
+    description: '读取通过 Socket Mode 收到的 Slack 消息（内存队列，最多保留 200 条，新的在前）。',
+    parameters,
+    output,
+    async execute(args) {
+      const raw = args as { limit?: unknown; markRead?: unknown }
+      const limit = clampLimit(raw.limit)
+      const markRead = raw.markRead === true
+      const queue = deps.inboxProvider()
+      const messages = queue.list(limit)
+      if (markRead) queue.clear()
+      return { messages: messages.map((m) => ({ ts: m.ts, channel: m.channel, user: m.user, text: m.text })) }
+    },
+  }
+}
+
+export function buildReplyTool(deps: ToolDeps): ToolDefinition {
+  const parameters = compileParameters({
+    channel: { type: 'string', required: true, description: '目标频道：频道名（如 #general）或频道 ID。' },
+    text: { type: 'string', required: true, description: '回复内容（Markdown 文本）。' },
+    thread_ts: { type: 'string', required: true, description: '要回复消息的 ts（来自 slack_inbox 返回的 ts）。' },
+  })
+
+  const output: ToolOutputDefinition = {
+    schema: NOTIFY_OUTPUT_SCHEMA,
+    render: (_args, value) => {
+      const v = value as { ts: string; channel: string }
+      return [textBlock('已线程回复 ' + v.channel + '（消息 ts：' + v.ts + '）。')]
+    },
+  }
+
+  return {
+    name: 'slack_reply',
+    description: '以线程回复的形式回复某条 Slack 消息（chat.postMessage 带 thread_ts）。',
+    parameters,
+    output,
+    timeoutMs: 30000,
+    async execute(args) {
+      const raw = args as { channel?: unknown; text?: unknown; thread_ts?: unknown }
+      const channel = assertChannel(raw.channel)
+      const text = assertText(raw.text)
+      const thread_ts = assertThreadTs(raw.thread_ts)
+      const client = deps.clientProvider()
+      try {
+        const result = await client.postMessage({ channel, text, thread_ts })
+        return { ts: result.ts, channel }
       } catch (error) {
         throw new Error(mapSlackError(error))
       }

@@ -9,3 +9,6 @@
         token: ''
         # 默认频道（可选）：模型未特别指定频道时的默认目标（如 #general）。
         defaultChannel: ''
+        # App-Level Token（xapp- 开头）：开启 Socket Mode 后用于接收消息。
+        # 留空时回退到环境变量 DSH_SLACK_APP_TOKEN；两者都为空则仅单向（不收消息）。
+        appToken: ''

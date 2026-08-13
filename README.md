@@ -1,16 +1,19 @@
 # dsh-slack
 
-DSH（DeepSeek Harness）社区插件：让 agent 向 Slack 发通知/桥接消息。
+DSH（DeepSeek Harness）社区插件：让 agent 与 Slack 双向通信。
 
-> **v0.1 范围（单向）**：本版本只做「agent → Slack」的单向通知（发消息、列频道）。
-> 双向对话（Slack 消息实时流入 agent）、Socket Mode、RTM、交互组件都不在 v0.1，见下方
+> **v0.2 范围（双向）**：v0.1 只做「agent → Slack」单向通知；v0.2 新增 Socket Mode，
+> 支持「Slack 消息 → agent」：`slack_inbox` 收取消息、`slack_reply` 线程回复。
+> RTM、交互组件（按钮/弹窗/slash command 回复）不在 v0.2，见下方
 > [已知限制与路线图](#已知限制与路线图)。
 
 ## 功能
 
-- `slack_notify`：向指定频道（或线程）发送一条 Markdown 文本消息，返回消息 `ts` 供后续引用。
+- `slack_notify`：向指定频道（或线程）发送一条 Markdown 文本消息，返回消息 `ts`。
 - `slack_channels`：列出机器人当前可见的频道（`conversations.list`）。
-- 配置走 `cordis.patch.yml`，令牌支持环境变量回退 `DSH_SLACK_TOKEN`。
+- `slack_inbox`：读取通过 Socket Mode 收到的消息（内存队列，最多保留 200 条）。
+- `slack_reply`：以线程回复形式回复某条收件箱消息（`chat.postMessage` 带 `thread_ts`）。
+- 配置走 `cordis.patch.yml`，令牌支持环境变量回退（`DSH_SLACK_TOKEN` / `DSH_SLACK_APP_TOKEN`）。
 
 ## 安装
 
@@ -20,7 +23,8 @@ DSH（DeepSeek Harness）社区插件：让 agent 向 Slack 发通知/桥接消�
 dsh plugin --profile web add dsh-slack
 ```
 
-安装后重启你的 dsh Web 服务，`slack_notify` / `slack_channels` 两个工具即对模型可见。
+安装后重启你的 dsh Web 服务，`slack_notify` / `slack_channels` / `slack_inbox` / `slack_reply`
+四个工具即对模型可见。
 
 ## 配置
 
@@ -30,16 +34,18 @@ dsh plugin --profile web add dsh-slack
 | 键 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `token` | string | 是* | Slack 令牌：机器人令牌（`xoxb-`）或用户令牌（`xoxp-`）。留空时回退到环境变量 `DSH_SLACK_TOKEN`。 |
+| `appToken` | string | 否* | App-Level Token（`xapp-` 开头），开启 Socket Mode 后用于接收消息。留空时回退到环境变量 `DSH_SLACK_APP_TOKEN`。 |
 | `defaultChannel` | string | 否 | 默认频道（如 `#general`）。模型未特别指定频道时的默认目标，写进 `channel` 参数说明里。 |
 
-`*` `token` 在「配置层」可留空，此时回退环境变量；两者都为空时插件照常加载，但调用工具时会
-返回中文报错（懒加载，见[错误处理](#错误处理)）。
+`*` `token` 在「配置层」可留空，此时回退环境变量；两者都为空时插件照常加载，但调用发消息/列频道/
+回复工具时会返回中文报错。`appToken` 留空则只告警、不崩溃，`slack_inbox` 返回空队列（单向模式）。
 
 **方式一：环境变量（推荐，不写死令牌）**
 
 ```sh
 # 在启动 dsh 的进程里设置
 export DSH_SLACK_TOKEN=xoxb-你的机器人令牌
+export DSH_SLACK_APP_TOKEN=xapp-你的App级令牌
 ```
 
 **方式二：profile 的 cordis.patch.yml 直接覆盖**
@@ -51,10 +57,12 @@ export DSH_SLACK_TOKEN=xoxb-你的机器人令牌
 - id: slack
   config:
     token: 'xoxb-你的机器人令牌'
+    appToken: 'xapp-你的App级令牌'
     defaultChannel: '#general'
 ```
 
-> 优先级：`config.token` > 环境变量 `DSH_SLACK_TOKEN`。
+> 优先级：`config.token` > 环境变量 `DSH_SLACK_TOKEN`；`config.appToken` > 环境变量
+> `DSH_SLACK_APP_TOKEN`。
 
 ### 创建 Slack App 并拿令牌
 
@@ -66,6 +74,23 @@ export DSH_SLACK_TOKEN=xoxb-你的机器人令牌
 4. 拿到 **Bot User OAuth Token**（以 `xoxb-` 开头）。
 5. 把机器人（App）加进它要发消息的频道：在频道里 `/invite @你的机器人`（私有频道必需）。
 
+### 开启 Socket Mode（双向收消息）
+
+要接收 Slack 消息（`slack_inbox` / `slack_reply`），需要开启 Socket Mode 并生成 App-Level Token：
+
+1. 打开 <https://api.slack.com/apps>，进入你的 App。
+2. 左侧 **Socket Mode** 页 → 打开开关（**Enable Socket Mode**）。
+3. 点 **Generate Token and Scopes** 生成 App-Level Token：给 Token 起名，勾选 `connections:write` scope。
+   生成后拿到以 `xapp-` 开头的 App-Level Token（只显示一次，请立即保存）。
+4. 进入 **Event Subscriptions** 页，开启事件订阅，在 **Subscribe to bot events → Add Bot User Event** 添加：
+   - `message.channels`（公开频道消息）
+   - `message.im`（机器人私信）
+5. 把 App-Level Token 配进 `appToken`（或环境变量 `DSH_SLACK_APP_TOKEN`）。
+6. 重启 dsh Web 服务，插件自动通过 Socket Mode 建立连接并开始收消息。
+
+> 未配置 `appToken` 时插件**不会崩溃**：只打印告警，`slack_inbox` 返回空队列（中文提示）。
+> Socket Mode 网络错误由 SDK 自动重连，插件只记录告警、不抛崩。
+
 ## 工具清单
 
 ### `slack_notify`
@@ -76,7 +101,7 @@ export DSH_SLACK_TOKEN=xoxb-你的机器人令牌
 | --- | --- | --- | --- |
 | `channel` | string | 是 | 频道名（如 `#general`）或频道 ID。 |
 | `text` | string | 是 | 要发送的 Markdown 文本。 |
-| `thread_ts` | string | 否 | 回复某条消息所在线程的 `ts`（即 `slack_notify` 返回的 `ts`）。 |
+| `thread_ts` | string | 否 | 回复某条消息所在线程的 `ts`。 |
 
 返回：`{ "ts": "...", "channel": "#general" }`（`ts` 供后续 `thread_ts` 引用）。
 
@@ -86,11 +111,35 @@ export DSH_SLACK_TOKEN=xoxb-你的机器人令牌
 
 无参数。返回：`{ "channels": [{ "id": "...", "name": "..." }, ...] }`。
 
+### `slack_inbox`
+
+读取通过 Socket Mode 收到的消息（内存队列，最多保留 200 条，新的在前）。
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `limit` | integer | 否 | 最多返回的消息数（默认 10，范围 1-50）。 |
+| `markRead` | boolean | 否 | 为 `true` 时，返回后清空收件箱队列（标记已读）。 |
+
+返回：`{ "messages": [{ "ts": "...", "channel": "...", "user": "...", "text": "..." }, ...] }`。
+
+### `slack_reply`
+
+以线程回复形式回复某条收件箱消息（底层 `chat.postMessage` 带 `thread_ts`）。
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `channel` | string | 是 | 频道名（如 `#general`）或频道 ID。 |
+| `text` | string | 是 | 回复内容（Markdown 文本）。 |
+| `thread_ts` | string | 是 | 要回复消息的 `ts`（来自 `slack_inbox` 返回的 `ts`）。 |
+
+返回：`{ "ts": "...", "channel": "#general" }`。
+
 ## 错误处理
 
 所有错误信息均为中文，模型与用户都能直接读懂：
 
 - 未配置令牌：`token 未配置：缺少 Slack 机器人令牌（xoxb-）…请在 profile 的 cordis.patch.yml 覆盖 slack 行的 config.token 并重启，或设置环境变量 DSH_SLACK_TOKEN。`
+- 未配置 App-Level Token：只告警，`slack_inbox` 返回空队列（含中文提示），不影响其它工具。
 - `invalid_auth`：提示检查/重新生成 token。
 - `channel_not_found`：提示频道名或频道 ID 错误。
 - `not_in_channel`：提示先把机器人 App 邀请进频道。
@@ -104,31 +153,26 @@ pnpm build     # tsc 编译 src → lib
 pnpm test      # 先 build，再用 node:test 跑 test/*.test.mjs
 ```
 
-测试无需真实 token：参数编译、配置解析（含 env 回退）、工具注册（2 个工具 + 缺配置中文报错）、
-注入 fake client 断言 `postMessage` 参数、输出 schema 纯 JSON 校验。
+测试无需真实 token：参数编译、配置解析（含 env 回退）、工具注册（4 个工具 + 缺配置中文报错）、
+注入 fake client 断言 `postMessage` 参数（含 `thread_ts`）、输出 schema 纯 JSON 校验、
+收件箱队列容量/清空、Socket Mode 事件解析（fake event 对象）、appToken 缺失不崩。
 
 ## 已知限制与路线图
 
-- **v0.1 是单向通知（agent→Slack）**：不能从 Slack 收消息反向驱动 agent。
-- **不支持** Socket Mode 实时接收、RTM、交互组件（按钮/弹窗/slash command 回复）。
+- **v0.1 是单向通知（agent→Slack）**；**v0.2 通过 Socket Mode 实现双向**（`slack_inbox` / `slack_reply`）。
+- **不支持** RTM、交互组件（按钮/弹窗/slash command 回复）。
+- `slack_inbox` 为进程内存队列：重启即清空，且不持久化；最多保留 200 条，满则丢最旧。
 - `channel` 为必填参数，`defaultChannel` 目前只作为说明提示写入 `channel` 参数描述，不替代
   必填的 `channel`。
-- 令牌缺失时插件仍会加载（懒加载），错误在工具被调用时才抛出。
+- 令牌缺失时插件仍会加载（懒加载），错误在工具被调用时才抛出；appToken 缺失则仅告警。
 
-路线图：v0.2 计划引入 Socket Mode（`@slack/socket-mode`）实现「Slack 消息 → agent」双向桥接与
-交互组件。
+路线图：v0.3 计划引入交互组件（按钮/弹窗）与持久化收件箱。
 
 ## 依赖
 
-- 运行时：`@slack/web-api`（官方 WebClient）
+- 运行时：`@slack/web-api`（官方 WebClient）、`@slack/socket-mode`（Socket Mode 客户端）
 - peer（由宿主提供，插件运行时不直接 import）：`@deepseek-ai/cordis`、`@deepseek-ai/dsh-tools`
 
 ## License
 
 MIT
-
-## 相关插件
-
-- [dsh-calendar](https://github.com/STARDUSTLC666/dsh-calendar) — CalDAV 日历五件套
-- [dsh-slack](https://github.com/STARDUSTLC666/dsh-slack) — Slack 通知/收件箱
-- [dsh-email](https://github.com/STARDUSTLC666/dsh-email) — 邮件六件套 + Web 设置页

@@ -9,21 +9,26 @@
 export interface SlackConfig {
   token: string
   defaultChannel: string
+  /** App-Level Token（xapp- 开头），用于 Socket Mode 接收消息。 */
+  appToken: string
 }
 
 /** token 的环境变量名。 */
 export const ENV_TOKEN = 'DSH_SLACK_TOKEN'
+/** appToken 的环境变量名。 */
+export const ENV_APP_TOKEN = 'DSH_SLACK_APP_TOKEN'
 
 /**
  * 解析原始配置。永不抛错：非法形状返回 undefined，让插件懒加载不失败。
  */
 export function parseConfig(raw: unknown): SlackConfig | undefined {
-  if (raw === undefined || raw === null) return { token: '', defaultChannel: '' }
+  if (raw === undefined || raw === null) return { token: '', defaultChannel: '', appToken: '' }
   if (typeof raw !== 'object' || Array.isArray(raw)) return undefined
   const obj = raw as Record<string, unknown>
   const token = typeof obj.token === 'string' ? obj.token.trim() : ''
   const defaultChannel = typeof obj.defaultChannel === 'string' ? obj.defaultChannel.trim() : ''
-  return { token, defaultChannel }
+  const appToken = typeof obj.appToken === 'string' ? obj.appToken.trim() : ''
+  return { token, defaultChannel, appToken }
 }
 
 /**
@@ -33,6 +38,15 @@ export function resolveToken(config: SlackConfig | undefined): string {
   const fromConfig = config?.token.trim() ?? ''
   if (fromConfig) return fromConfig
   return process.env[ENV_TOKEN]?.trim() ?? ''
+}
+
+/**
+ * 解析 appToken：config.appToken 优先，其次环境变量 DSH_SLACK_APP_TOKEN。
+ */
+export function resolveAppToken(config: SlackConfig | undefined): string {
+  const fromConfig = config?.appToken?.trim() ?? ''
+  if (fromConfig) return fromConfig
+  return process.env[ENV_APP_TOKEN]?.trim() ?? ''
 }
 
 /**

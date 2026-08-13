@@ -1,11 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseConfig, resolveToken, resolveDefaultChannel, requireToken } from '../lib/index.js'
+import { parseConfig, resolveToken, resolveAppToken, resolveDefaultChannel, requireToken } from '../lib/index.js'
 
 test('parseConfig 处理缺失/空配置（不抛错）', () => {
-  assert.deepEqual(parseConfig(undefined), { token: '', defaultChannel: '' })
-  assert.deepEqual(parseConfig(null), { token: '', defaultChannel: '' })
-  assert.deepEqual(parseConfig({}), { token: '', defaultChannel: '' })
+  assert.deepEqual(parseConfig(undefined), { token: '', defaultChannel: '', appToken: '' })
+  assert.deepEqual(parseConfig(null), { token: '', defaultChannel: '', appToken: '' })
+  assert.deepEqual(parseConfig({}), { token: '', defaultChannel: '', appToken: '' })
 })
 
 test('parseConfig 非法形状返回 undefined', () => {
@@ -31,6 +31,20 @@ test('requireToken：缺失时抛中文提示', () => {
 })
 
 test('resolveDefaultChannel 返回配置的默认频道', () => {
-  assert.equal(resolveDefaultChannel({ token: 'x', defaultChannel: '#general' }), '#general')
+  assert.equal(resolveDefaultChannel({ token: 'x', defaultChannel: '#general', appToken: '' }), '#general')
   assert.equal(resolveDefaultChannel(undefined), '')
+})
+
+test('resolveAppToken：config.appToken 优先，其次环境变量 DSH_SLACK_APP_TOKEN', () => {
+  delete process.env.DSH_SLACK_APP_TOKEN
+  assert.equal(resolveAppToken({ token: '', defaultChannel: '', appToken: 'xapp-config' }), 'xapp-config')
+  assert.equal(resolveAppToken({ token: '', defaultChannel: '', appToken: '' }), '')
+  process.env.DSH_SLACK_APP_TOKEN = 'xapp-env'
+  assert.equal(resolveAppToken({ token: '', defaultChannel: '', appToken: '' }), 'xapp-env')
+  assert.equal(resolveAppToken({ token: '', defaultChannel: '', appToken: 'xapp-config' }), 'xapp-config')
+  delete process.env.DSH_SLACK_APP_TOKEN
+})
+
+test('parseConfig 解析 appToken 字段', () => {
+  assert.equal(parseConfig({ token: 'xoxb-1', defaultChannel: '', appToken: 'xapp-2' }).appToken, 'xapp-2')
 })

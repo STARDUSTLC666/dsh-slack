@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@slack/socket-mode':
+        specifier: ^3.0.0
+        version: 3.0.0(undici@7.29.0)
       '@slack/web-api':
         specifier: ^8.0.0
         version: 8.0.0
@@ -24,6 +27,12 @@ packages:
   '@slack/logger@5.0.0':
     resolution: {integrity: sha512-VGXhmmgsAo9shdQYh4tFDndd+7nsgp0Y5h0UPDaUp8K359pBasI6YdkMqFW3mCOxLQkq09qj7o7cq6f3DuXcJQ==}
     engines: {node: '>= 20', npm: '>=9.6.4'}
+
+  '@slack/socket-mode@3.0.0':
+    resolution: {integrity: sha512-QShO60SB0E+HH+TbcKj3CBEQbodToRyiXnxuSB4t1kvUlqEmuGA1nOOjrRDkDJbOECAZ13PLe4ek9SrntpfoYg==}
+    engines: {node: '>=20', npm: '>=9.6.4'}
+    peerDependencies:
+      undici: ^7.0.0
 
   '@slack/types@3.0.0':
     resolution: {integrity: sha512-KNOqpnNAlsFt5Jk9XBclslQ0lobRIg/0tnhpmvZJAglHJx9E8oceN8hC3gaBzkR6UzQ9Wzq4rLsJ98wUcxWPfw==}
@@ -73,11 +82,23 @@ packages:
   undici-types@7.18.2:
     resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
 
+  undici@7.29.0:
+    resolution: {integrity: sha512-IDxfleLmmbSskfWSUATiN1nfn2rDuvnMOqb5CWR92iIfojA0Ud+ulOAAEQ57LPr9rWmsreUyf5lwyao+7GNNVw==}
+    engines: {node: '>=20.18.1'}
+
 snapshots:
 
   '@slack/logger@5.0.0':
     dependencies:
       '@types/node': 24.13.3
+
+  '@slack/socket-mode@3.0.0(undici@7.29.0)':
+    dependencies:
+      '@slack/logger': 5.0.0
+      '@slack/web-api': 8.0.0
+      '@types/node': 24.13.3
+      eventemitter3: 5.0.4
+      undici: 7.29.0
 
   '@slack/types@3.0.0': {}
 
@@ -123,3 +144,5 @@ snapshots:
   typescript@5.9.3: {}
 
   undici-types@7.18.2: {}
+
+  undici@7.29.0: {}
