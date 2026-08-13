@@ -1,0 +1,11 @@
+# dsh-slack 的 bundle patch：向 profile 根插入 slack 插件行。
+# 用户可在 profile 的 cordis.patch.yml 里按 id 覆盖本行 config（整体替换）。
+- insert:
+    - id: slack
+      name: dsh-slack
+      config:
+        # Slack 令牌：机器人令牌（xoxb-）或用户令牌（xoxp-）。
+        # 留空时回退到环境变量 DSH_SLACK_TOKEN。
+        token: ''
+        # 默认频道（可选）：模型未特别指定频道时的默认目标（如 #general）。
+        defaultChannel: ''

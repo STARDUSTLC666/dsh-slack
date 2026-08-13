@@ -1,0 +1,54 @@
+{
+  "name": "dsh-slack",
+  "version": "0.1.0",
+  "description": "DSH 社区插件：Slack 通知/桥接（v0.1 单向 agent→Slack，配置走 cordis.patch.yml）",
+  "type": "module",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepare": "tsc -p tsconfig.json",
+    "test": "pnpm run build && node --test \"test/*.test.mjs\"",
+    "prepublishOnly": "pnpm run build"
+  },
+  "dependencies": {
+    "@slack/web-api": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.7.3"
+  },
+  "repository": {
+    "url": "https://github.com/STARDUSTLC666/dsh-slack",
+    "type": "git"
+  },
+  "bugs": {
+    "url": "https://github.com/STARDUSTLC666/dsh-slack/issues"
+  },
+  "homepage": "https://github.com/STARDUSTLC666/dsh-slack#readme",
+  "author": "stardustlc",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "dsh"
+  ]
+}
