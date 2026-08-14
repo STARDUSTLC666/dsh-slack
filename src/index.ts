@@ -84,7 +84,7 @@ export function apply(ctx: SlackContext, rawConfig: unknown): void {
     // 每次调用时重新解析配置（config.token 优先，环境变量回退），并懒创建客户端。
     const current = parseConfig(rawConfig)
     const token = requireToken(current)
-    return createWebSlackClient(token)
+    return createWebSlackClient(token, current?.slackApiUrl)
   }
   const inboxProvider = (): ReturnType<typeof createInboxQueue> => inboxQueue
 

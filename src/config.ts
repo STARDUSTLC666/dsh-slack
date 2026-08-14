@@ -11,6 +11,8 @@ export interface SlackConfig {
   defaultChannel: string
   /** App-Level Token（xapp- 开头），用于 Socket Mode 接收消息。 */
   appToken: string
+  /** Slack Web API 基地址；默认官方 https://slack.com/api/。企业网格（Enterprise Grid）与本地协议级测试可覆盖。 */
+  slackApiUrl?: string
 }
 
 /** token 的环境变量名。 */
@@ -28,7 +30,8 @@ export function parseConfig(raw: unknown): SlackConfig | undefined {
   const token = typeof obj.token === 'string' ? obj.token.trim() : ''
   const defaultChannel = typeof obj.defaultChannel === 'string' ? obj.defaultChannel.trim() : ''
   const appToken = typeof obj.appToken === 'string' ? obj.appToken.trim() : ''
-  return { token, defaultChannel, appToken }
+  const slackApiUrl = typeof obj.slackApiUrl === 'string' && obj.slackApiUrl.trim() !== '' ? obj.slackApiUrl.trim() : undefined
+  return { token, defaultChannel, appToken, ...(slackApiUrl !== undefined ? { slackApiUrl } : {}) }
 }
 
 /**

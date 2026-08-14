@@ -27,8 +27,8 @@ export interface SlackClient {
 }
 
 /** 用官方 WebClient 实现。 */
-export function createWebSlackClient(token: string): SlackClient {
-  const client = new WebClient(token)
+export function createWebSlackClient(token: string, slackApiUrl?: string): SlackClient {
+  const client = new WebClient(token, { ...(slackApiUrl !== undefined && slackApiUrl !== '' ? { slackApiUrl } : {}) })
   return {
     async postMessage(params: PostMessageParams): Promise<{ ts: string }> {
       const result = await client.chat.postMessage({
