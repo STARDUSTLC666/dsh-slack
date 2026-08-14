@@ -1,3 +1,5 @@
+[中文](README.md)
+
 # dsh-slack
 
 DSH (DeepSeek Harness) community plugin: lets the agent communicate with Slack bidirectionally.
