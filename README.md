@@ -1,6 +1,8 @@
 [English](README.en.md)
 
-`# dsh-slack
+# dsh-slack
+
+> **让 agent 进你的 Slack**：发消息、看频道、收消息、回线程，双向通信。
 
 ![npm version](https://img.shields.io/npm/v/dsh-slack?label=npm&color=blue) ![npm downloads](https://img.shields.io/npm/dm/dsh-slack) ![license](https://img.shields.io/npm/l/dsh-slack) ![stars](https://img.shields.io/github/stars/STARDUSTLC666/dsh-slack?style=social)
 
