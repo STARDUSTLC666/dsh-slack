@@ -40,7 +40,7 @@
     "typescript": "^5.7.3"
   },
   "repository": {
-    "url": "https://github.com/STARDUSTLC666/dsh-slack",
+    "url": "git+https://github.com/STARDUSTLC666/dsh-slack.git",
     "type": "git"
   },
   "bugs": {
