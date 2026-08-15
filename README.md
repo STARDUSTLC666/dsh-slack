@@ -6,6 +6,8 @@
 
 ![npm version](https://img.shields.io/npm/v/dsh-slack?label=npm&color=blue) ![npm downloads](https://img.shields.io/npm/dm/dsh-slack) ![license](https://img.shields.io/npm/l/dsh-slack) ![stars](https://img.shields.io/github/stars/STARDUSTLC666/dsh-slack?style=social)
 
+[![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+
 
 DSH（DeepSeek Harness）社区插件：让 agent 与 Slack 双向通信。
 

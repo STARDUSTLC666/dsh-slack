@@ -2,6 +2,8 @@
 
 # dsh-slack
 
+[![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+
 DSH (DeepSeek Harness) community plugin: lets the agent communicate with Slack bidirectionally.
 
 > **v0.2 scope (two-way)**: v0.1 only did one-way "agent → Slack" notifications; v0.2 adds Socket Mode,
