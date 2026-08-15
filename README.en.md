@@ -12,10 +12,20 @@ DSH (DeepSeek Harness) community plugin: lets the agent communicate with Slack b
 ## Features
 
 - `slack_notify`: send a Markdown text message to a channel (or thread), returning the message `ts`.
-- `slack_channels`: list the channels currently visible to the bot (`conversations.list`).
-- `slack_inbox`: read messages received via Socket Mode (in-memory queue, keeps up to 200).
+- `slack_channels`: list the channels currently visible to the bot (`conversations.list`, paginating through `next_cursor` until complete).
+- `slack_inbox`: read messages received via Socket Mode (in-memory queue, keeps up to 200; deduplicates retries and consumes atomically with `markRead=true`).
 - `slack_reply`: reply to an inbox message as a thread (`chat.postMessage` with `thread_ts`).
+- WebClient instances are cached by `token + slackApiUrl` and rebuilt automatically when configuration changes.
 - Configuration via `cordis.patch.yml`; tokens support environment-variable fallback (`DSH_SLACK_TOKEN` / `DSH_SLACK_APP_TOKEN`).
+
+### v0.2.3 improvements
+
+- `slack_channels` paginates automatically so large workspaces no longer lose channels after the first page.
+- `slack_inbox` deduplicates Slack's at-least-once event deliveries and drains atomically on `markRead`.
+- WebClient reuse avoids rebuilding clients on every tool call.
+- Pagination has a page cap to prevent loops from a misbehaving `next_cursor`.
+- Error mapping adds `not_authed` / `is_archived` / `msg_too_long` / `ratelimited`.
+
 
 ## Installation
 
@@ -142,7 +152,10 @@ All error messages are in Chinese, readable by both the model and the user:
 - `invalid_auth`: hints to check/regenerate the token.
 - `channel_not_found`: hints the channel name or ID is wrong.
 - `not_in_channel`: hints to invite the bot App into the channel first.
-- `token_revoked` / `account_inactive` / `missing_scope`: hints permission or token expiry, reinstall the App.
+- `token_revoked` / `account_inactive` / `missing_scope` / `not_authed`: hints permission or token expiry, reinstall the App.
+- `is_archived`: hints the channel is archived and cannot receive messages.
+- `msg_too_long`: hints the message exceeds Slack's 40,000-character limit.
+- `ratelimited`: hints to retry after a short wait.
 
 ## Development and testing
 
@@ -154,7 +167,7 @@ pnpm test      # 先 build，再用 node:test 跑 test/*.test.mjs
 
 Tests need no real token: parameter compilation, config parsing (incl. env fallback), tool registration (4 tools + Chinese error on missing config),
 injecting a fake client to assert `postMessage` arguments (incl. `thread_ts`), output schema pure-JSON validation,
-inbox queue capacity/clear, Socket Mode event parsing (fake event objects), and no-crash on missing appToken.
+inbox queue capacity/clear/deduplication/atomic drain, Socket Mode event parsing (fake event objects), and no-crash on missing appToken.
 
 ## Known limitations and roadmap
 

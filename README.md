@@ -17,10 +17,20 @@ DSH（DeepSeek Harness）社区插件：让 agent 与 Slack 双向通信。
 ## 功能
 
 - `slack_notify`：向指定频道（或线程）发送一条 Markdown 文本消息，返回消息 `ts`。
-- `slack_channels`：列出机器人当前可见的频道（`conversations.list`）。
-- `slack_inbox`：读取通过 Socket Mode 收到的消息（内存队列，最多保留 200 条）。
+- `slack_channels`：列出机器人当前可见的频道（`conversations.list`，自动沿 `next_cursor` 翻页拉全）。
+- `slack_inbox`：读取通过 Socket Mode 收到的消息（内存队列，最多保留 200 条；自动去重，`markRead=true` 原子消费）。
 - `slack_reply`：以线程回复形式回复某条收件箱消息（`chat.postMessage` 带 `thread_ts`）。
+- WebClient 按 `token + slackApiUrl` 缓存复用，配置变更时自动重建。
 - 配置走 `cordis.patch.yml`，令牌支持环境变量回退（`DSH_SLACK_TOKEN` / `DSH_SLACK_APP_TOKEN`）。
+
+### v0.2.3 优化
+
+- `slack_channels` 自动分页：频道很多时不再只返回第一页。
+- `slack_inbox` 去重 + `drain` 原子消费：Slack 重投的事件不会重复入队，`markRead` 期间新到的消息也不会被误清。
+- WebClient 复用：同一 `token + slackApiUrl` 只创建一个客户端，减少重复初始化。
+- 分页增加页数上限，防止异常 `next_cursor` 导致死循环。
+- 错误映射补充 `not_authed` / `is_archived` / `msg_too_long` / `ratelimited`。
+
 
 ## 安装
 
@@ -150,7 +160,10 @@ export DSH_SLACK_APP_TOKEN=xapp-你的App级令牌
 - `invalid_auth`：提示检查/重新生成 token。
 - `channel_not_found`：提示频道名或频道 ID 错误。
 - `not_in_channel`：提示先把机器人 App 邀请进频道。
-- `token_revoked` / `account_inactive` / `missing_scope`：提示权限或令牌失效，需重新安装 App。
+- `token_revoked` / `account_inactive` / `missing_scope` / `not_authed`：提示权限或令牌失效，需重新安装 App。
+- `is_archived`：提示频道已归档，不能发消息。
+- `msg_too_long`：提示 Slack 单条消息超过 40,000 字符。
+- `ratelimited`：提示请求太频繁，稍后重试。
 
 ## 开发与测试
 
@@ -162,7 +175,7 @@ pnpm test      # 先 build，再用 node:test 跑 test/*.test.mjs
 
 测试无需真实 token：参数编译、配置解析（含 env 回退）、工具注册（4 个工具 + 缺配置中文报错）、
 注入 fake client 断言 `postMessage` 参数（含 `thread_ts`）、输出 schema 纯 JSON 校验、
-收件箱队列容量/清空、Socket Mode 事件解析（fake event 对象）、appToken 缺失不崩。
+收件箱队列容量/清空/去重/原子 drain、Socket Mode 事件解析（fake event 对象）、appToken 缺失不崩。
 
 ## 已知限制与路线图
 
