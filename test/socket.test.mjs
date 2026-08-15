@@ -54,6 +54,24 @@ test('InboxQueue clear 清空队列', () => {
   assert.deepEqual(q.list(10), [])
 })
 
+test('InboxQueue 忽略 Slack 重投的重复事件', () => {
+  const q = createInboxQueue()
+  q.push(msg('1.2', 'a'))
+  q.push(msg('1.2', 'a'))
+  q.push(msg('2.3', 'b'))
+  assert.equal(q.size, 2)
+  assert.deepEqual(q.list(10).map((m) => m.ts), ['2.3', '1.2'])
+})
+
+test('InboxQueue drain 原子消费：返回最近 limit 条并清空整个队列', () => {
+  const q = createInboxQueue()
+  for (let i = 0; i < 30; i++) q.push(msg('t' + i, 'm' + i))
+  const out = q.drain(10)
+  assert.equal(out.length, 10)
+  assert.equal(out[0].ts, 't29')
+  assert.equal(q.size, 0)
+})
+
 test('buildInboxTool 返回队列消息，limit clamp 1-50，默认 10', async () => {
   const q = createInboxQueue()
   for (let i = 0; i < 60; i++) q.push(msg('t' + i, 'm' + i))

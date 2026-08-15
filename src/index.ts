@@ -80,11 +80,19 @@ export function apply(ctx: SlackContext, rawConfig: unknown): void {
   const inboxQueue = createInboxQueue()
 
   const configProvider = (): SlackConfig | undefined => config
+    let client: SlackClient | undefined
+    let clientFingerprint = ''
   const clientProvider = (): SlackClient => {
-    // 每次调用时重新解析配置（config.token 优先，环境变量回退），并懒创建客户端。
+    // 每次调用时重新解析配置（config.token 优先，环境变量回退）。
+      // 同一 token/API 地址复用 WebClient；配置变更时自动重建。
     const current = parseConfig(rawConfig)
     const token = requireToken(current)
-    return createWebSlackClient(token, current?.slackApiUrl)
+    const fingerprint = token + '\u0000' + (current?.slackApiUrl ?? '')
+      if (client === undefined || fingerprint !== clientFingerprint) {
+        client = createWebSlackClient(token, current?.slackApiUrl)
+        clientFingerprint = fingerprint
+      }
+      return client
   }
   const inboxProvider = (): ReturnType<typeof createInboxQueue> => inboxQueue
 

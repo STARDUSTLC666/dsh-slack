@@ -40,14 +40,35 @@ export function createWebSlackClient(token: string, slackApiUrl?: string): Slack
       return { ts }
     },
     async listChannels(): Promise<ChannelInfo[]> {
-      const result = await client.conversations.list({ types: 'public_channel,private_channel' })
-      const channels: ChannelInfo[] = []
-      for (const ch of result.channels ?? []) {
-        if (typeof ch.id === 'string' && typeof ch.name === 'string') {
-          channels.push({ id: ch.id, name: ch.name })
-        }
-      }
-      return channels
+      let cursor: string | undefined
+      let pages = 0
+        const allChannels: ChannelInfo[] = []
+        const seen = new Set<string>()
+        // conversations.list 默认分页（每页约 100-200 条）；企业工作区频道很多时
+        // 必须沿 next_cursor 翻完，否则模型会漏掉后面的频道。
+        do {
+            pages += 1
+            if (pages > 20) break
+          const result = await client.conversations.list({
+            types: 'public_channel,private_channel',
+            ...(cursor !== undefined ? { cursor } : {}),
+          })
+          for (const ch of (result.channels ?? [])) {
+            if (typeof ch.id === 'string' && typeof ch.name === 'string' && !seen.has(ch.id)) {
+              seen.add(ch.id)
+              allChannels.push({ id: ch.id, name: ch.name })
+            }
+          }
+          const next = result.response_metadata?.next_cursor
+          cursor = typeof next === 'string' && next !== cursor ? next : ''
+        } while (cursor !== '')
+      return allChannels
+      /*
+        // if (typeof ch.id === 'string' && typeof ch.name === 'string') {
+          // allChannels.push({ id: ch.id, name: ch.name })
+        */
+      // }
+      // removed duplicate return
     },
   }
 }
@@ -67,9 +88,18 @@ export function mapSlackError(error: unknown): string {
   if (code === 'not_in_channel') {
     return '机器人不在该频道中（not_in_channel）：请先把机器人 App 添加（invite）到该频道。'
   }
-  if (code === 'token_revoked' || code === 'account_inactive' || code === 'missing_scope') {
+  if (code === 'token_revoked' || code === 'account_inactive' || code === 'missing_scope' || code === 'not_authed') {
     return `Slack 令牌或权限不足（${code}）：请确认已勾选 chat:write 与 channels:read，并重新安装 App 拿新令牌。`
   }
+    if (code === 'is_archived') {
+      return '频道已归档（is_archived）：机器人不能在已归档频道发消息，请改用其他频道。'
+    }
+    if (code === 'msg_too_long') {
+      return '消息过长（msg_too_long）：Slack 单条消息不能超过 40,000 字符，请精简后重试。'
+    }
+    if (code === 'ratelimited' || code === 'rate_limited') {
+      return 'Slack 触发限流（ratelimited）：请求太频繁，请稍等几秒后重试。'
+    }
   const message = (error as { message?: string } | null | undefined)?.message
   return message ? `Slack API 调用失败：${message}` : 'Slack API 调用失败：未知错误。'
 }

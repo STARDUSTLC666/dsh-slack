@@ -183,8 +183,8 @@ export function buildInboxTool(deps: ToolDeps): ToolDefinition {
       const limit = clampLimit(raw.limit)
       const markRead = raw.markRead === true
       const queue = deps.inboxProvider()
-      const messages = queue.list(limit)
-      if (markRead) queue.clear()
+      const messages = markRead ? queue.drain(limit) : queue.list(limit)
+      
       return { messages: messages.map((m) => ({ ts: m.ts, channel: m.channel, user: m.user, text: m.text })) }
     },
   }

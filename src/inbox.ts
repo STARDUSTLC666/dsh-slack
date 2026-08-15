@@ -24,17 +24,26 @@ export function createInboxQueue(capacity: number = INBOX_CAPACITY): InboxQueue 
  */
 export class InboxQueue {
   private items: InboxMessage[] = []
+  private readonly seen = new Set<string>()
   readonly capacity: number
 
   constructor(capacity: number = INBOX_CAPACITY) {
     this.capacity = capacity
   }
 
-  /** 追加一条消息；超过容量时丢弃最旧。 */
+  private key(message: InboxMessage): string {
+    return message.channel + '\u0000' + message.ts + '\u0000' + message.user + '\u0000' + message.text
+  }
+
+  /** 追加一条消息；Slack 至少投递一次，重复事件直接忽略，超过容量时丢弃最旧。 */
   push(message: InboxMessage): void {
+    const key = this.key(message)
+    if (this.seen.has(key)) return
+    this.seen.add(key)
     this.items.push(message)
     if (this.items.length > this.capacity) {
-      this.items.splice(0, this.items.length - this.capacity)
+      const removed = this.items.splice(0, this.items.length - this.capacity)
+      for (const item of removed) this.seen.delete(this.key(item))
     }
   }
 
@@ -45,9 +54,26 @@ export class InboxQueue {
     return this.items.slice(-n).reverse()
   }
 
+  /**
+   * 原子地取出最近 limit 条并清空整个队列。
+   * 避免“先 list 再 clear”之间新到的消息被误清掉。
+   */
+  drain(limit: number): InboxMessage[] {
+    const n = Math.max(0, Math.trunc(limit))
+    if (n === 0) {
+      this.clear()
+      return []
+    }
+    const out = this.items.splice(-n).reverse()
+    this.items = []
+    this.seen.clear()
+    return out
+  }
+
   /** 清空队列。 */
   clear(): void {
     this.items = []
+    this.seen.clear()
   }
 
   /** 当前队列长度。 */
