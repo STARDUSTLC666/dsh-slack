@@ -25,11 +25,17 @@ export function startSocketModeClient(
   const client = new SocketModeClient({ appToken })
 
   client.on('slack_event', (...args: unknown[]) => {
+    const raw = args[0] as { ack?: () => Promise<unknown> }
     try {
-      const message = parseMessageEvent(args[0])
+      const message = parseMessageEvent(raw)
       if (message !== null) handler.onMessage(message)
     } catch (error) {
       warn('[dsh-slack] 解析 Socket Mode 事件失败：', error)
+    } finally {
+      // events_api 事件必须 ack，否则 Slack 会重投；重复投递由收件箱 seen 去重兜底。
+      if (typeof raw.ack === 'function') {
+        void raw.ack().catch(() => { /* ack 失败忽略，交给 Slack 重投 */ })
+      }
     }
   })
 
