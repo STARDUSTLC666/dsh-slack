@@ -34,6 +34,10 @@ DSH（DeepSeek Harness）社区插件：让 agent 与 Slack 双向通信。
 - 错误映射补充 `not_authed` / `is_archived` / `msg_too_long` / `ratelimited`。
 
 
+## 兼容性
+
+在 `@deepseek-ai/dsh@0.1.1-rc.2` 上验证（2026-08-26）。遵循 cordis 组合包补丁模型（`cordis.patch.yml` + `dsh.bundle.patch`），运行时不 import 任何 `@deepseek-ai/*` 内部模块。
+
 ## 安装
 
 插件运行在宿主进程内，通过 `dsh plugin` 安装进 profile，重启后生效：
@@ -109,6 +113,15 @@ export DSH_SLACK_APP_TOKEN=xapp-你的App级令牌
 
 > 未配置 `appToken` 时插件**不会崩溃**：只打印告警，`slack_inbox` 返回空队列（中文提示）。
 > Socket Mode 网络错误由 SDK 自动重连，插件只记录告警、不抛崩。
+
+
+## 卸载
+
+```bash
+dsh plugin --profile web remove dsh-slack
+```
+
+卸载后重启 Web 服务。如需彻底清理，可再手动删除自己 profile `cordis.patch.yml` 中的对应插件行。
 
 ## 工具清单
 
@@ -198,4 +211,3 @@ pnpm test      # 先 build，再用 node:test 跑 test/*.test.mjs
 ## License
 
 MIT
-

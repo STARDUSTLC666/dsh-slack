@@ -29,6 +29,10 @@ DSH (DeepSeek Harness) community plugin: lets the agent communicate with Slack b
 - Error mapping adds `not_authed` / `is_archived` / `msg_too_long` / `ratelimited`.
 
 
+## Compatibility
+
+Verified against `@deepseek-ai/dsh@0.1.1-rc.2` on 2026-08-26. Built for the cordis patch-bundle plugin model (`cordis.patch.yml` + `dsh.bundle.patch`). No runtime imports of `@deepseek-ai/*` internals.
+
 ## Installation
 
 The plugin runs inside the host process, is installed into the profile via `dsh plugin`, and takes effect after a restart:
@@ -38,6 +42,15 @@ dsh plugin --profile web add dsh-slack
 ```
 
 After installing, restart your dsh Web service; the four tools `slack_notify` / `slack_channels` / `slack_inbox` / `slack_reply` become visible to the model.
+
+## Uninstall
+
+```bash
+dsh plugin --profile web remove dsh-slack
+```
+
+Then restart the web service. To clean up fully, also remove the plugin entry from your profile `cordis.patch.yml` if you overrode it.
+
 
 ## Configuration
 
