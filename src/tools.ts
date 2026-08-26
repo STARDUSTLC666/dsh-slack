@@ -1,6 +1,6 @@
 import { compileParameters } from './compile.js'
 import type { SlackConfig } from './config.js'
-import { resolveDefaultChannel } from './config.js'
+import { resolveAppToken, resolveDefaultChannel, resolveToken } from './config.js'
 import type { ContentBlock, ToolDefinition, ToolOutputDefinition } from './types.js'
 import type { SlackClient } from './slack-client.js'
 import { assertChannel, assertText, assertThreadTs, mapSlackError } from './slack-client.js'
@@ -72,6 +72,40 @@ function textBlock(text: string): ContentBlock {
 function clampLimit(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 10
   return Math.min(50, Math.max(1, Math.trunc(value)))
+}
+
+/** 自检工具：检查 token / appToken / 默认频道配置，不发起网络请求。 */
+export function buildHealthTool(deps: ToolDeps): ToolDefinition {
+  return {
+    name: 'slack_health',
+    description: 'dsh-slack 自检：检查 botToken / appToken / 默认频道配置是否就绪（不发起网络请求）。遇到问题时先运行本工具定位。',
+    parameters: compileParameters({}),
+    output: {
+      schema: { type: 'object', additionalProperties: true },
+      render: (_args: unknown, value: unknown) => {
+        const rec = (value ?? {}) as Record<string, unknown>
+        const rawChecks = Array.isArray(rec.checks) ? rec.checks : []
+        const lines = ['dsh-slack 自检' + (rec.ok === true ? '：正常。' : '：发现问题。')]
+        for (const item of rawChecks) {
+          const c = (item ?? {}) as Record<string, unknown>
+          lines.push('- ' + String(c.name) + '：' + (c.ok === true ? '✅ ' + String(c.detail ?? '') : '❌ ' + String(c.detail ?? '')))
+        }
+        return [textBlock(lines.join('\n'))]
+      },
+    },
+    async execute() {
+      const config = deps.configProvider()
+      const checks: Array<Record<string, unknown>> = []
+      const token = resolveToken(config)
+      checks.push({ name: 'botToken', ok: token !== '', detail: token !== '' ? '已配置' : '未配置：请填 token 或环境变量（发送/频道工具需要）' })
+      const appToken = resolveAppToken(config)
+      checks.push({ name: 'appToken', ok: true, detail: appToken !== '' ? '已配置（Socket Mode 收件箱可用）' : '未配置（收件箱功能不可用，通知不受影响）' })
+      const defaultChannel = resolveDefaultChannel(config)
+      checks.push({ name: '默认频道', ok: true, detail: defaultChannel !== '' ? defaultChannel : '未配置（发送时必须显式给 channel）' })
+      const ok = token !== ''
+      return { ok, plugin: 'dsh-slack', checks }
+    },
+  }
 }
 
 export function buildNotifyTool(deps: ToolDeps): ToolDefinition {

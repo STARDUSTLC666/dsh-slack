@@ -6,7 +6,7 @@
 
 import { parseConfig, requireToken, resolveAppToken, resolveToken, type SlackConfig } from './config.js'
 import { createWebSlackClient, type SlackClient } from './slack-client.js'
-import { buildChannelsTool, buildInboxTool, buildNotifyTool, buildReplyTool, type ToolDeps } from './tools.js'
+import { buildChannelsTool, buildInboxTool, buildNotifyTool, buildHealthTool, buildReplyTool, type ToolDeps } from './tools.js'
 import { createInboxQueue } from './inbox.js'
 import { startSocketModeClient } from './socket.js'
 import type { SlackContext } from './types.js'
@@ -116,4 +116,5 @@ export function apply(ctx: SlackContext, rawConfig: unknown): void {
   ctx.tools.register(buildChannelsTool(deps))
   ctx.tools.register(buildInboxTool(deps))
   ctx.tools.register(buildReplyTool(deps))
+  ctx.tools.register(buildHealthTool(deps))
 }

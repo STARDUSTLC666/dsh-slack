@@ -38,7 +38,7 @@ export function parseConfig(raw: unknown): SlackConfig | undefined {
  * 解析 token：config.token 优先，其次环境变量 DSH_SLACK_TOKEN。
  */
 export function resolveToken(config: SlackConfig | undefined): string {
-  const fromConfig = config?.token.trim() ?? ''
+  const fromConfig = config?.token?.trim() ?? ''
   if (fromConfig) return fromConfig
   return process.env[ENV_TOKEN]?.trim() ?? ''
 }
