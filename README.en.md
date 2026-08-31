@@ -22,13 +22,15 @@ DSH (DeepSeek Harness) community plugin: lets the agent communicate with Slack b
 - WebClient instances are cached by `token + slackApiUrl` and rebuilt automatically when configuration changes.
 - Configuration via `cordis.patch.yml`; tokens support environment-variable fallback (`DSH_SLACK_TOKEN` / `DSH_SLACK_APP_TOKEN`).
 
-### v0.2.3 improvements
+## Changelog
 
-- `slack_channels` paginates automatically so large workspaces no longer lose channels after the first page.
-- `slack_inbox` deduplicates Slack's at-least-once event deliveries and drains atomically on `markRead`.
-- WebClient reuse avoids rebuilding clients on every tool call.
-- Pagination has a page cap to prevent loops from a misbehaving `next_cursor`.
-- Error mapping adds `not_authed` / `is_archived` / `msg_too_long` / `ratelimited`.
+- **0.3.0**: new `slack_health` self-check (one-call token / Socket Mode config health); fixed a startup crash from optional chaining when only some config fields are set (e.g. token without appToken).
+- **0.2.3**:
+  - `slack_channels` paginates automatically so large workspaces no longer lose channels after the first page.
+  - `slack_inbox` deduplicates Slack's at-least-once event deliveries and drains atomically on `markRead`.
+  - WebClient reuse avoids rebuilding clients on every tool call.
+  - Pagination has a page cap to prevent loops from a misbehaving `next_cursor`.
+  - Error mapping adds `not_authed` / `is_archived` / `msg_too_long` / `ratelimited`.
 
 
 ## Compatibility

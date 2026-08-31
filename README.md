@@ -25,13 +25,15 @@ DSH（DeepSeek Harness）社区插件：让 agent 与 Slack 双向通信。
 - WebClient 按 `token + slackApiUrl` 缓存复用，配置变更时自动重建。
 - 配置走 `cordis.patch.yml`，令牌支持环境变量回退（`DSH_SLACK_TOKEN` / `DSH_SLACK_APP_TOKEN`）。
 
-### v0.2.3 优化
+## 版本记录
 
-- `slack_channels` 自动分页：频道很多时不再只返回第一页。
-- `slack_inbox` 去重 + `drain` 原子消费：Slack 重投的事件不会重复入队，`markRead` 期间新到的消息也不会被误清。
-- WebClient 复用：同一 `token + slackApiUrl` 只创建一个客户端，减少重复初始化。
-- 分页增加页数上限，防止异常 `next_cursor` 导致死循环。
-- 错误映射补充 `not_authed` / `is_archived` / `msg_too_long` / `ratelimited`。
+- **0.3.0**：新增 `slack_health` 自检（令牌/Socket Mode 配置一键体检）；修复只配置部分字段（如只有 token 没有 appToken）时可选链导致的启动崩溃。
+- **0.2.3**：
+  - `slack_channels` 自动分页：频道很多时不再只返回第一页。
+  - `slack_inbox` 去重 + `drain` 原子消费：Slack 重投的事件不会重复入队，`markRead` 期间新到的消息也不会被误清。
+  - WebClient 复用：同一 `token + slackApiUrl` 只创建一个客户端，减少重复初始化。
+  - 分页增加页数上限，防止异常 `next_cursor` 导致死循环。
+  - 错误映射补充 `not_authed` / `is_archived` / `msg_too_long` / `ratelimited`。
 
 
 ## 兼容性
