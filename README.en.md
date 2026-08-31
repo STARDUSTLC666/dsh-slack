@@ -1,5 +1,7 @@
 [中文](README.md)
 
+![npm](https://img.shields.io/npm/v/dsh-slack) ![downloads](https://img.shields.io/npm/dm/dsh-slack) ![license](https://img.shields.io/github/license/STARDUSTLC666/dsh-slack) ![stars](https://img.shields.io/github/stars/STARDUSTLC666/dsh-slack?style=social)
+
 # dsh-slack
 
 [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
