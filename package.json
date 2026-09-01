@@ -1,6 +1,6 @@
 {
   "name": "dsh-slack",
-  "version": "0.3.1",
+  "version": "0.3.0",
   "description": "DSH 社区插件：Slack 通知/桥接（v0.2 支持 Socket Mode 双向：收件箱 + 线程回复）",
   "type": "module",
   "main": "./lib/index.js",
@@ -22,13 +22,6 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
-    },
-    "compatibility": {
-      "dshReleases": {
-        "0.1.0-rc.8": "unknown",
-        "0.1.1-rc.1": "unknown",
-        "0.1.1-rc.2": "compatible"
-      }
     }
   },
   "scripts": {
