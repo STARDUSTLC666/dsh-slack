@@ -11,6 +11,10 @@
 
 DSH（DeepSeek Harness）社区插件：让 agent 与 Slack 双向通信。
 
+## 兼容性
+
+验证宿主：官方源码构建的 Harness `0.2.0-rc.1`（commit `407e65c8`）+ Node `24.16.0`（2026-09-28）。43 项插件测试在隔离环境全部通过；同一个宿主里 18 个插件共同加载，注册 5 个工具，工具 schema 与健康检查契约通过。本轮未启用真实端口与外部服务。
+
 > **v0.2 范围（双向）**：v0.1 只做「agent → Slack」单向通知；v0.2 新增 Socket Mode，
 > 支持「Slack 消息 → agent」：`slack_inbox` 收取消息、`slack_reply` 线程回复。
 > RTM、交互组件（按钮/弹窗/slash command 回复）不在 v0.2，见下方
