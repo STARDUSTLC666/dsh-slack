@@ -8,7 +8,6 @@
 
 [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
 
-
 DSH（DeepSeek Harness）社区插件：让 agent 与 Slack 双向通信。
 
 ## 兼容性
@@ -38,11 +37,6 @@ DSH（DeepSeek Harness）社区插件：让 agent 与 Slack 双向通信。
   - WebClient 复用：同一 `token + slackApiUrl` 只创建一个客户端，减少重复初始化。
   - 分页增加页数上限，防止异常 `next_cursor` 导致死循环。
   - 错误映射补充 `not_authed` / `is_archived` / `msg_too_long` / `ratelimited`。
-
-
-## 兼容性
-
-已在官方 `@deepseek-ai/dsh@0.1.5-rc.1`、Node `24.16.0` 上验证（2026-09-11）：18 个组件与 Modlens 同载，工具 schema、技能注册及离线只读调用检查通过。采用 `cordis.patch.yml` + `dsh.bundle.patch` 组合包模型。Node 要求与该版本 Harness 一致：22.19 及以上的 22.x，或 24 及以上。外部服务的实际业务操作需按各组件配置单独验证。
 
 ## 安装
 
@@ -119,7 +113,6 @@ export DSH_SLACK_APP_TOKEN=xapp-你的App级令牌
 
 > 未配置 `appToken` 时插件**不会崩溃**：只打印告警，`slack_inbox` 返回空队列（中文提示）。
 > Socket Mode 网络错误由 SDK 自动重连，插件只记录告警、不抛崩。
-
 
 ## 卸载
 
