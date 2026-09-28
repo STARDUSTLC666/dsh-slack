@@ -1,6 +1,6 @@
 {
   "name": "dsh-slack",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "DSH Slack 插件：通知与桥接，Socket Mode 双向消息（收件箱 + 线程回复）。",
   "type": "module",
   "main": "./lib/index.js",
