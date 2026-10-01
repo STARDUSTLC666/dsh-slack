@@ -35,7 +35,9 @@ DSH (DeepSeek Harness) community plugin: lets the agent communicate with Slack b
 
 ## Compatibility
 
-Validation host: Harness `0.2.0-rc.1` built from official sources (commit `407e65c8`) with Node `24.16.0` on 2026-09-28. All 43 plugin tests pass in an isolated environment; all 18 plugins mount together in one host registering 5 tools, with tool schemas and health-check contracts passing. No live ports or external services were exercised in this round.
+Validation host: Harness `0.2.0-rc.2` built from its official release tag (commit `639ed01539`), Windows and Node `24.16.0`. All 43 plugin tests pass; all 18 plugins mount together and this plugin registers all five tools, with tool schemas and health-check contracts passing. Real Slack authorization, Socket Mode delivery and sending have not been verified.
+
+Version 0.3.3 requires the official Socket Mode SDK 3.1 or newer, which supports Undici 7/8, and explicitly declares its transport dependency. This fixes combined installations that paired an older SDK with the host's Undici 8. Both language versions of this README are included in the npm package.
 
 ## Installation
 
