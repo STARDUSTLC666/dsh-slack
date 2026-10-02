@@ -1,210 +1,44 @@
-[中文](README.md)
-
-![npm](https://img.shields.io/npm/v/dsh-slack) ![downloads](https://img.shields.io/npm/dm/dsh-slack) ![license](https://img.shields.io/github/license/STARDUSTLC666/dsh-slack) ![stars](https://img.shields.io/github/stars/STARDUSTLC666/dsh-slack?style=social)
-
 # dsh-slack
 
-[![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+[中文](README.md)
 
-DSH (DeepSeek Harness) community plugin: lets the agent communicate with Slack bidirectionally.
+Connect Slack for notifications, a Socket Mode inbox and thread replies.
 
-> **v0.2 scope (two-way)**: v0.1 only did one-way "agent → Slack" notifications; v0.2 adds Socket Mode,
-> enabling "Slack message → agent": `slack_inbox` receives messages, `slack_reply` replies in threads.
-> RTM and interactive components (buttons/modals/slash command replies) are out of scope for v0.2 — see
-> [Known limitations and roadmap](#known-limitations-and-roadmap) below.
+[![npm](https://img.shields.io/npm/v/dsh-slack)](https://www.npmjs.com/package/dsh-slack) [![downloads](https://img.shields.io/npm/dm/dsh-slack)](https://www.npmjs.com/package/dsh-slack)
 
-## Features
+## What it does
 
-- `slack_notify`: send a Markdown text message to a channel (or thread), returning the message `ts`.
-- `slack_channels`: list the channels currently visible to the bot (`conversations.list`, paginating through `next_cursor` until complete).
-- `slack_inbox`: read messages received via Socket Mode (in-memory queue, keeps up to 200; deduplicates retries and consumes atomically with `markRead=true`).
-- `slack_reply`: reply to an inbox message as a thread (`chat.postMessage` with `thread_ts`).
-- WebClient instances are cached by `token + slackApiUrl` and rebuilt automatically when configuration changes.
-- Configuration via `cordis.patch.yml`; tokens support environment-variable fallback (`DSH_SLACK_TOKEN` / `DSH_SLACK_APP_TOKEN`).
+- Send Markdown notifications to channels or threads.
+- List visible channels and read the Socket Mode inbox.
+- Reply in threads and check connection or token configuration.
 
-## Changelog
+## Install
 
-- **0.3.0**: new `slack_health` self-check (one-call token / Socket Mode config health); fixed a startup crash from optional chaining when only some config fields are set (e.g. token without appToken).
-- **0.2.3**:
-  - `slack_channels` paginates automatically so large workspaces no longer lose channels after the first page.
-  - `slack_inbox` deduplicates Slack's at-least-once event deliveries and drains atomically on `markRead`.
-  - WebClient reuse avoids rebuilding clients on every tool call.
-  - Pagination has a page cap to prevent loops from a misbehaving `next_cursor`.
-  - Error mapping adds `not_authed` / `is_archived` / `msg_too_long` / `ratelimited`.
-
-
-## Compatibility
-
-Validation host: Harness `0.2.0-rc.2` built from its official release tag (commit `639ed01539`), Windows and Node `24.16.0`. All 43 plugin tests pass; all 18 plugins mount together and this plugin registers all five tools, with tool schemas and health-check contracts passing. Real Slack authorization, Socket Mode delivery and sending have not been verified.
-
-Version 0.3.3 requires the official Socket Mode SDK 3.1 or newer, which supports Undici 7/8, and explicitly declares its transport dependency. This fixes combined installations that paired an older SDK with the host's Undici 8. Both language versions of this README are included in the npm package.
-
-## Installation
-
-The plugin runs inside the host process, is installed into the profile via `dsh plugin`, and takes effect after a restart:
-
-```sh
-dsh plugin --profile web add dsh-slack
-```
-
-After installing, restart your dsh Web service; the four tools `slack_notify` / `slack_channels` / `slack_inbox` / `slack_reply` become visible to the model.
-
-## Uninstall
+In DSH Desktop, install `dsh-slack` from the Plugins panel. If the bundled dsh command is available:
 
 ```bash
-dsh plugin --profile web remove dsh-slack
+dsh plugin --profile desktop add dsh-slack
 ```
 
-Then restart the web service. To clean up fully, also remove the plugin entry from your profile `cordis.patch.yml` if you overrode it.
+For the web version, replace `desktop` with `web`. Restart DSH after installation.
 
+## Start using it
 
-## Configuration
+Configure your Slack App and tokens, then ask to review the inbox and identify messages that need a reply.
 
-Configuration lives in the profile's `cordis.patch.yml`; override this plugin's line by `id: slack` (overriding replaces that line's `config` wholesale — it does not merge). Available options:
+## Requirements and configuration
 
-| Key | Type | Required | Description |
-| --- | --- | --- | --- |
-| `token` | string | yes* | Slack token: bot token (`xoxb-`) or user token (`xoxp-`). When empty, falls back to the `DSH_SLACK_TOKEN` env var. |
-| `appToken` | string | no* | App-Level Token (starts with `xapp-`); used to receive messages after enabling Socket Mode. When empty, falls back to the `DSH_SLACK_APP_TOKEN` env var. |
-| `defaultChannel` | string | no | Default channel (e.g. `#general`). The default target when the model doesn't specify a channel; written into the `channel` parameter description. |
+Requires a bot token. Socket Mode also needs an app token and permissions; the inbox is stored in memory.
 
-`*` `token` may be left empty at the "config layer", in which case it falls back to the env var; when both are empty the plugin still loads, but calling the send/list/reply tools returns a Chinese error. An empty `appToken` only warns — no crash — and `slack_inbox` returns an empty queue (one-way mode).
+Detailed configuration, tool arguments and troubleshooting are in the [usage guide](docs/USAGE.en.md). For standalone development, follow the Node requirement in [package.json](package.json).
 
-**Method 1: environment variables (recommended, no hard-coded tokens)**
+## Documentation
 
-```sh
-# 在启动 dsh 的进程里设置
-export DSH_SLACK_TOKEN=xoxb-你的机器人令牌
-export DSH_SLACK_APP_TOKEN=xapp-你的App级令牌
-```
-
-**Method 2: override in the profile's cordis.patch.yml**
-
-In your profile directory (`$DSH_HOME/profiles/web/cordis.patch.yml`) append:
-
-```yaml
-# 覆盖 dsh-slack 的 slack 行配置（整体替换）
-- id: slack
-  config:
-    token: 'xoxb-你的机器人令牌'
-    appToken: 'xapp-你的App级令牌'
-    defaultChannel: '#general'
-```
-
-> Priority: `config.token` > env var `DSH_SLACK_TOKEN`; `config.appToken` > env var
-> `DSH_SLACK_APP_TOKEN`.
-
-### Create a Slack App and get a token
-
-1. Open <https://api.slack.com/apps>, click **Create New App** (choose `From scratch`, name the app, select the workspace).
-2. On the **OAuth & Permissions** page, under **Scopes → Bot Token Scopes** check:
-   - `chat:write` (required to send messages)
-   - `channels:read` (required to list channels)
-3. Back at the top, click **Install to Workspace** (authorize).
-4. Grab the **Bot User OAuth Token** (starts with `xoxb-`).
-5. Add the bot (App) to the channels it should post in: `/invite @your-bot` in the channel (required for private channels).
-
-### Enable Socket Mode (two-way message receiving)
-
-To receive Slack messages (`slack_inbox` / `slack_reply`), enable Socket Mode and generate an App-Level Token:
-
-1. Open <https://api.slack.com/apps> and open your App.
-2. Open the **Socket Mode** page → turn on the toggle (**Enable Socket Mode**).
-3. Click **Generate Token and Scopes** to create an App-Level Token: name the token, check the `connections:write` scope.
-   Copy the `xapp-` App-Level Token (shown only once — save it immediately).
-4. Open the **Event Subscriptions** page, enable events, and under **Subscribe to bot events → Add Bot User Event** add:
-   - `message.channels` (public channel messages)
-   - `message.im` (bot DMs)
-5. Put the App-Level Token into `appToken` (or the `DSH_SLACK_APP_TOKEN` env var).
-6. Restart the dsh Web service; the plugin connects automatically via Socket Mode and starts receiving messages.
-
-> Without `appToken` the plugin **won't crash**: it only prints a warning and `slack_inbox` returns an empty queue (with a Chinese hint).
-> Socket Mode network errors are auto-reconnected by the SDK; the plugin only logs a warning and never throws.
-
-## Tool reference
-
-### `slack_notify`
-
-Send Markdown text to a channel/thread (underlying `chat.postMessage`).
-
-| Param | Type | Required | Description |
-| --- | --- | --- | --- |
-| `channel` | string | yes | Channel name (e.g. `#general`) or channel ID. |
-| `text` | string | yes | The Markdown text to send. |
-| `thread_ts` | string | no | The `ts` of the thread to reply to. |
-
-Returns: `{ "ts": "...", "channel": "#general" }` (`ts` for later `thread_ts` reference).
-
-### `slack_channels`
-
-List channels visible to the bot (underlying `conversations.list`).
-
-No parameters. Returns: `{ "channels": [{ "id": "...", "name": "..." }, ...] }`.
-
-### `slack_inbox`
-
-Read messages received via Socket Mode (in-memory queue, keeps up to 200, newest first).
-
-| Param | Type | Required | Description |
-| --- | --- | --- | --- |
-| `limit` | integer | no | Maximum number of messages to return (default 10, range 1-50). |
-| `markRead` | boolean | no | When `true`, clears the inbox queue after returning (mark as read). |
-
-Returns: `{ "messages": [{ "ts": "...", "channel": "...", "user": "...", "text": "..." }, ...] }`.
-
-### `slack_reply`
-
-Reply to an inbox message as a thread (underlying `chat.postMessage` with `thread_ts`).
-
-| Param | Type | Required | Description |
-| --- | --- | --- | --- |
-| `channel` | string | yes | Channel name (e.g. `#general`) or channel ID. |
-| `text` | string | yes | Reply content (Markdown text). |
-| `thread_ts` | string | yes | The `ts` of the message to reply to (from `slack_inbox`). |
-
-Returns: `{ "ts": "...", "channel": "#general" }`.
-
-## Error handling
-
-All error messages are in Chinese, readable by both the model and the user:
-
-- Unconfigured token: `token 未配置：缺少 Slack 机器人令牌（xoxb-）…请在 profile 的 cordis.patch.yml 覆盖 slack 行的 config.token 并重启，或设置环境变量 DSH_SLACK_TOKEN。`
-- Unconfigured App-Level Token: only a warning; `slack_inbox` returns an empty queue (with a Chinese hint) and other tools are unaffected.
-- `invalid_auth`: hints to check/regenerate the token.
-- `channel_not_found`: hints the channel name or ID is wrong.
-- `not_in_channel`: hints to invite the bot App into the channel first.
-- `token_revoked` / `account_inactive` / `missing_scope` / `not_authed`: hints permission or token expiry, reinstall the App.
-- `is_archived`: hints the channel is archived and cannot receive messages.
-- `msg_too_long`: hints the message exceeds Slack's 40,000-character limit.
-- `ratelimited`: hints to retry after a short wait.
-
-## Development and testing
-
-```sh
-pnpm install   # 安装依赖并触发 prepare（tsc 构建）
-pnpm build     # tsc 编译 src → lib
-pnpm test      # 先 build，再用 node:test 跑 test/*.test.mjs
-```
-
-Tests need no real token: parameter compilation, config parsing (incl. env fallback), tool registration (4 tools + Chinese error on missing config),
-injecting a fake client to assert `postMessage` arguments (incl. `thread_ts`), output schema pure-JSON validation,
-inbox queue capacity/clear/deduplication/atomic drain, Socket Mode event parsing (fake event objects), and no-crash on missing appToken.
-
-## Known limitations and roadmap
-
-- **v0.1 is one-way notification (agent→Slack)**; **v0.2 is two-way via Socket Mode** (`slack_inbox` / `slack_reply`).
-- **No** RTM or interactive components (buttons/modals/slash command replies).
-- `slack_inbox` is an in-process memory queue: cleared on restart, not persisted; keeps up to 200, dropping the oldest when full.
-- `channel` is a required parameter; `defaultChannel` is currently only written into the `channel` parameter description as a hint — it does not replace the required `channel`.
-- With a missing token the plugin still loads (lazy loading); the error is only thrown when the tool is called; a missing appToken only warns.
-
-Roadmap: v0.3 plans to introduce interactive components (buttons/modals) and a persisted inbox.
-
-## Dependencies
-
-- Runtime: `@slack/web-api` (official WebClient), `@slack/socket-mode` (Socket Mode client)
-- peer (provided by the host; not imported directly by the plugin at runtime): `@deepseek-ai/cordis`, `@deepseek-ai/dsh-tools`
+- [Usage and troubleshooting](docs/USAGE.en.md)
+- [Changelog](CHANGELOG.md)
+- [Validation scope and history](docs/VALIDATION.md)
+- [Report a problem or suggest a feature](https://github.com/STARDUSTLC666/dsh-slack/issues)
 
 ## License
 
-MIT
+[MIT](LICENSE)

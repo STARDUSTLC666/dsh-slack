@@ -1,7 +1,7 @@
 {
   "name": "dsh-slack",
   "version": "0.3.3",
-  "description": "DSH Slack 插件：通知与桥接，Socket Mode 双向消息（收件箱 + 线程回复）。",
+  "description": "连接 Slack，发送通知并处理 Socket Mode 收件箱与线程回复。",
   "type": "module",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
@@ -17,7 +17,9 @@
     "lib",
     "cordis.patch.yml",
     "README.md",
-    "README.en.md"
+    "README.en.md",
+    "docs",
+    "CHANGELOG.md"
   ],
   "license": "MIT",
   "dsh": {
