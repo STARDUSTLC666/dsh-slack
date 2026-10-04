@@ -6,7 +6,7 @@
 
 Connect Slack for notifications, a Socket Mode inbox and thread replies.
 
-[![npm](https://img.shields.io/npm/v/dsh-slack)](https://www.npmjs.com/package/dsh-slack) [![downloads](https://img.shields.io/npm/dm/dsh-slack)](https://www.npmjs.com/package/dsh-slack)
+[![npm](https://img.shields.io/npm/v/dsh-slack)](https://www.npmjs.com/package/dsh-slack) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-downloads.svg)](https://www.npmjs.com/package/dsh-slack)
 
 ## What it does
 

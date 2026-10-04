@@ -6,7 +6,7 @@
 
 连接 Slack，发送通知并处理 Socket Mode 收件箱与线程回复。
 
-[![npm](https://img.shields.io/npm/v/dsh-slack)](https://www.npmjs.com/package/dsh-slack) [![downloads](https://img.shields.io/npm/dm/dsh-slack)](https://www.npmjs.com/package/dsh-slack)
+[![npm](https://img.shields.io/npm/v/dsh-slack)](https://www.npmjs.com/package/dsh-slack) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-downloads.svg)](https://www.npmjs.com/package/dsh-slack)
 
 ## 功能
 
