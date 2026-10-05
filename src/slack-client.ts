@@ -28,7 +28,9 @@ export interface SlackClient {
 
 /** 用官方 WebClient 实现。 */
 export function createWebSlackClient(token: string, slackApiUrl?: string): SlackClient {
-  const client = new WebClient(token, { ...(slackApiUrl !== undefined && slackApiUrl !== '' ? { slackApiUrl } : {}) })
+  const client = new WebClient(token, {
+    timeout: 25000, retryConfig: { retries: 0 }, rejectRateLimitedCalls: true,
+    ...(slackApiUrl !== undefined && slackApiUrl !== '' ? { slackApiUrl } : {}) })
   return {
     async postMessage(params: PostMessageParams): Promise<{ ts: string }> {
       const result = await client.chat.postMessage({
@@ -37,38 +39,32 @@ export function createWebSlackClient(token: string, slackApiUrl?: string): Slack
         ...(params.thread_ts !== undefined ? { thread_ts: params.thread_ts } : {}),
       })
       const ts = typeof result.ts === 'string' ? result.ts : ''
+      if (!ts) throw new Error('Slack 未返回消息回执，无法确认提交结果；请先检查频道，避免直接重发。')
       return { ts }
     },
     async listChannels(): Promise<ChannelInfo[]> {
       let cursor: string | undefined
       let pages = 0
-        const allChannels: ChannelInfo[] = []
-        const seen = new Set<string>()
-        // conversations.list 默认分页（每页约 100-200 条）；企业工作区频道很多时
-        // 必须沿 next_cursor 翻完，否则模型会漏掉后面的频道。
-        do {
-            pages += 1
-            if (pages > 20) break
-          const result = await client.conversations.list({
-            types: 'public_channel,private_channel',
-            ...(cursor !== undefined ? { cursor } : {}),
-          })
-          for (const ch of (result.channels ?? [])) {
-            if (typeof ch.id === 'string' && typeof ch.name === 'string' && !seen.has(ch.id)) {
-              seen.add(ch.id)
-              allChannels.push({ id: ch.id, name: ch.name })
-            }
+      const allChannels: ChannelInfo[] = []
+      const seen = new Set<string>()
+      // Follow the official pagination cursor, with the existing 20-page cap.
+      do {
+        pages += 1
+        if (pages > 20) break
+        const result = await client.conversations.list({
+          types: 'public_channel,private_channel',
+          ...(cursor !== undefined ? { cursor } : {}),
+        })
+        for (const ch of (result.channels ?? [])) {
+          if (typeof ch.id === 'string' && typeof ch.name === 'string' && !seen.has(ch.id)) {
+            seen.add(ch.id)
+            allChannels.push({ id: ch.id, name: ch.name })
           }
-          const next = result.response_metadata?.next_cursor
-          cursor = typeof next === 'string' && next !== cursor ? next : ''
-        } while (cursor !== '')
+        }
+        const next = result.response_metadata?.next_cursor
+        cursor = typeof next === 'string' && next !== cursor ? next : ''
+      } while (cursor !== '')
       return allChannels
-      /*
-        // if (typeof ch.id === 'string' && typeof ch.name === 'string') {
-          // allChannels.push({ id: ch.id, name: ch.name })
-        */
-      // }
-      // removed duplicate return
     },
   }
 }

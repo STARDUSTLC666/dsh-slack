@@ -1,8 +1,25 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { createServer } from 'node:http'
+import { createWebSlackClient } from '../lib/slack-client.js'
 import { buildNotifyTool, buildChannelsTool, mapSlackError, assertChannel, assertText } from '../lib/index.js'
 
 const CFG = () => ({ token: 'xoxb-test', defaultChannel: '#general' })
+
+test('真实 WebClient 不自动重试限流或服务端失败，缺失回执不会假报成功', async t => {
+  let requests = 0, status = 503, payload = { ok: false, error: 'fixture_failure' }
+  const server = createServer((_req, res) => { requests++; res.writeHead(status, { 'content-type': 'application/json', 'retry-after': '0' }); res.end(JSON.stringify(payload)) })
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => new Promise(resolve => server.close(resolve)))
+  const client = createWebSlackClient('synthetic-token', 'http://127.0.0.1:' + server.address().port + '/')
+  for (const code of [503, 429]) {
+    status = code; const before = requests
+    await assert.rejects(client.postMessage({ channel: 'C1', text: 'local fixture only' }))
+    assert.equal(requests - before, 1)
+  }
+  status = 200; payload = { ok: true }
+  await assert.rejects(client.postMessage({ channel: 'C1', text: 'local fixture only' }), /无法确认提交结果/)
+})
 
 test('buildNotifyTool 用注入 client 调 postMessage，参数正确', async () => {
   let captured = null

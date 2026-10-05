@@ -4,6 +4,10 @@
 
 These English notes preserve the earlier translations. The main changelog contains the consolidated version history.
 
+## 0.3.4 (2026-10-05)
+
+- Mark only displayed inbox messages as read, preserving unread entries and retry deduplication. Disable implicit send retries; missing receipts prompt channel inspection.
+
 ## 0.3.0 (2026-08-26)
 
 - new `slack_health` self-check (one-call token / Socket Mode config health); fixed a startup crash from optional chaining when only some config fields are set (e.g. token without appToken).

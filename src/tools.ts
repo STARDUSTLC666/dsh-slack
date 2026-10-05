@@ -46,6 +46,7 @@ const CHANNELS_OUTPUT_SCHEMA = {
 const INBOX_OUTPUT_SCHEMA = {
   type: 'object',
   properties: {
+    remaining: { type: 'integer', minimum: 0 },
     messages: {
       type: 'array',
       items: {
@@ -61,7 +62,7 @@ const INBOX_OUTPUT_SCHEMA = {
       },
     },
   },
-  required: ['messages'],
+  required: ['messages', 'remaining'],
   additionalProperties: true,
 } as const
 
@@ -192,18 +193,18 @@ export function buildChannelsTool(deps: ToolDeps): ToolDefinition {
 export function buildInboxTool(deps: ToolDeps): ToolDefinition {
   const parameters = compileParameters({
     limit: { type: 'integer', description: '最多返回的消息数（默认 10，范围 1-50）。' },
-    markRead: { type: 'boolean', description: '为 true 时，返回后清空收件箱队列（标记已读）。' },
+    markRead: { type: 'boolean', description: '为 true 时，只将本次返回的消息标记已读；未返回的消息继续保留。' },
   })
 
   const output: ToolOutputDefinition = {
     schema: INBOX_OUTPUT_SCHEMA,
     render: (_args, value) => {
-      const v = value as { messages: InboxMessage[] }
+      const v = value as { messages: InboxMessage[]; remaining?: number }
       if (v.messages.length === 0) {
         return [textBlock('收件箱为空：尚未开启 Socket Mode（缺少 appToken），或暂未收到新的 Slack 消息。请确认已配置 appToken 并订阅 message.channels / message.im 事件。')]
       }
       const lines = v.messages.map((m) => '[' + m.channel + '] ' + m.user + '（ts: ' + m.ts + '）：' + m.text)
-      return [textBlock('收件箱（' + v.messages.length + ' 条，新的在前）：\n' + lines.join('\n'))]
+      return [textBlock('收件箱（' + v.messages.length + ' 条，新的在前；剩余未读 ' + (v.remaining ?? 0) + ' 条）：\n' + lines.join('\n'))]
     },
   }
 
@@ -219,7 +220,7 @@ export function buildInboxTool(deps: ToolDeps): ToolDefinition {
       const queue = deps.inboxProvider()
       const messages = markRead ? queue.drain(limit) : queue.list(limit)
       
-      return { messages: messages.map((m) => ({ ts: m.ts, channel: m.channel, user: m.user, text: m.text })) }
+      return { messages: messages.map((m) => ({ ts: m.ts, channel: m.channel, user: m.user, text: m.text })), remaining: queue.size }
     },
   }
 }

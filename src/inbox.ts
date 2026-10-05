@@ -40,10 +40,10 @@ export class InboxQueue {
     const key = this.key(message)
     if (this.seen.has(key)) return
     this.seen.add(key)
+    while (this.seen.size > Math.max(200, this.capacity * 4)) this.seen.delete(this.seen.values().next().value!)
     this.items.push(message)
     if (this.items.length > this.capacity) {
-      const removed = this.items.splice(0, this.items.length - this.capacity)
-      for (const item of removed) this.seen.delete(this.key(item))
+      this.items.splice(0, this.items.length - this.capacity)
     }
   }
 
@@ -55,25 +55,21 @@ export class InboxQueue {
   }
 
   /**
-   * 原子地取出最近 limit 条并清空整个队列。
+   * 原子地取出最近 limit 条，只将返回的消息标记为已读。
    * 避免“先 list 再 clear”之间新到的消息被误清掉。
    */
   drain(limit: number): InboxMessage[] {
     const n = Math.max(0, Math.trunc(limit))
     if (n === 0) {
-      this.clear()
       return []
     }
     const out = this.items.splice(-n).reverse()
-    this.items = []
-    this.seen.clear()
     return out
   }
 
   /** 清空队列。 */
   clear(): void {
     this.items = []
-    this.seen.clear()
   }
 
   /** 当前队列长度。 */

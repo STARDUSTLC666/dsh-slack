@@ -2,6 +2,10 @@
 
 [返回简介](../README.md) · [更新记录](../CHANGELOG.md) · [验证记录](VALIDATION.md)
 
+## 本次改进
+
+slack_inbox { limit: 10, markRead: true } 返回 remaining，继续调用可查看余下消息。遇到超时或缺少 ts 时先检查频道，确认未发送后再重试，避免重复通知。
+
 ## 功能
 
 - `slack_notify`：向指定频道（或线程）发送一条 Markdown 文本消息，返回消息 `ts`。

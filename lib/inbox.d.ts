@@ -27,7 +27,7 @@ export declare class InboxQueue {
     /** 返回最近 limit 条消息（新的在前）。 */
     list(limit: number): InboxMessage[];
     /**
-     * 原子地取出最近 limit 条并清空整个队列。
+     * 原子地取出最近 limit 条，只将返回的消息标记为已读。
      * 避免“先 list 再 clear”之间新到的消息被误清掉。
      */
     drain(limit: number): InboxMessage[];

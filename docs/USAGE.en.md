@@ -2,6 +2,10 @@
 
 [Overview](../README.en.md) · [Changelog](../CHANGELOG.md) · [Validation](VALIDATION.md)
 
+## Current improvements
+
+slack_inbox with limit=10 and markRead=true returns remaining; call again for unread messages. After a timeout or missing ts, inspect the channel before retrying to avoid duplicate notifications.
+
 ## Features
 
 - `slack_notify`: send a Markdown text message to a channel (or thread), returning the message `ts`.
