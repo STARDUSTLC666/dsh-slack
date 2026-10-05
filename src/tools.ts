@@ -46,7 +46,7 @@ const CHANNELS_OUTPUT_SCHEMA = {
 const INBOX_OUTPUT_SCHEMA = {
   type: 'object',
   properties: {
-    remaining: { type: 'integer', minimum: 0 },
+        remaining: { type: 'integer' },
     messages: {
       type: 'array',
       items: {
