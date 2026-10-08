@@ -8,6 +8,8 @@ Connect Slack for notifications, a Socket Mode inbox and thread replies.
 
 [![npm](https://img.shields.io/npm/v/dsh-slack)](https://www.npmjs.com/package/dsh-slack) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-downloads.svg)](https://www.npmjs.com/package/dsh-slack)
 
+Feedback and contributions are welcome: report [issues](https://github.com/STARDUSTLC666/dsh-slack/issues) or submit [pull requests](https://github.com/STARDUSTLC666/dsh-slack/pulls).
+
 ## What it does
 
 - Send Markdown notifications to channels or threads.
