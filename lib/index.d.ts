@@ -11,7 +11,7 @@ export { parseConfig, resolveToken, resolveDefaultChannel, requireToken, resolve
 export { createWebSlackClient, mapSlackError, assertChannel, assertText, assertThreadTs, type SlackClient, type PostMessageParams, type ChannelInfo, } from './slack-client.js';
 export { buildNotifyTool, buildChannelsTool, buildInboxTool, buildReplyTool, type ToolDeps } from './tools.js';
 export { parseMessageEvent, InboxQueue, createInboxQueue, INBOX_CAPACITY, type InboxMessage } from './inbox.js';
-export { startSocketModeClient, type SocketMessageHandler } from './socket.js';
+export { startSocketModeClient, type SocketMessageHandler, type SocketStatus, type SocketDisposer, type SocketLifecycleOptions } from './socket.js';
 export type { SlackContext, ToolDefinition, ToolOutputDefinition, ContentBlock } from './types.js';
 /**
  * 插件入口。配置缺失【不失败】（懒加载）：只 console.warn；

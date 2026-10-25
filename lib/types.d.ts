@@ -28,6 +28,7 @@ export interface SlackContext {
     };
     /** Cordis 生命周期：传入启动函数，其返回的清理函数在 dispose 时执行。 */
     effect?: (start: () => void | (() => void)) => void;
+    on?: (event: 'dispose', listener: () => void) => unknown;
     /** 可选日志器；缺省回退 console.warn。 */
     logger?: {
         warn(message: string, ...args: unknown[]): void;

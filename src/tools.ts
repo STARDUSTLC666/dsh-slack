@@ -5,12 +5,14 @@ import type { ContentBlock, ToolDefinition, ToolOutputDefinition } from './types
 import type { SlackClient } from './slack-client.js'
 import { assertChannel, assertText, assertThreadTs, mapSlackError } from './slack-client.js'
 import type { InboxMessage, InboxQueue } from './inbox.js'
+import type { SocketStatus } from './socket.js'
 
 /** 工具构建的依赖注入点。 */
 export interface ToolDeps {
   clientProvider: () => SlackClient
   configProvider: () => SlackConfig | undefined
   inboxProvider: () => InboxQueue
+  socketStatusProvider?: () => SocketStatus | undefined
 }
 
 const NOTIFY_OUTPUT_SCHEMA = {
@@ -79,7 +81,7 @@ function clampLimit(value: unknown): number {
 export function buildHealthTool(deps: ToolDeps): ToolDefinition {
   return {
     name: 'slack_health',
-    description: 'dsh-slack 自检：检查 botToken / appToken / 默认频道配置是否就绪（不发起网络请求）。遇到问题时先运行本工具定位。',
+    description: 'dsh-slack 自检：检查 botToken / appToken / 默认频道配置和当前 Socket Mode 连接状态（不额外发起网络请求）。遇到问题时先运行本工具定位。',
     parameters: compileParameters({}),
     output: {
       schema: { type: 'object', additionalProperties: true },
@@ -100,11 +102,14 @@ export function buildHealthTool(deps: ToolDeps): ToolDefinition {
       const token = resolveToken(config)
       checks.push({ name: 'botToken', ok: token !== '', detail: token !== '' ? '已配置' : '未配置：请填 token 或环境变量（发送/频道工具需要）' })
       const appToken = resolveAppToken(config)
-      checks.push({ name: 'appToken', ok: true, detail: appToken !== '' ? '已配置（Socket Mode 收件箱可用）' : '未配置（收件箱功能不可用，通知不受影响）' })
+      checks.push({ name: 'appToken', ok: appToken === '' || appToken.startsWith('xapp-'), detail: appToken !== '' ? '已配置（Socket Mode 连接状态见下项）' : '未配置（收件箱功能不可用，通知不受影响）' })
       const defaultChannel = resolveDefaultChannel(config)
       checks.push({ name: '默认频道', ok: true, detail: defaultChannel !== '' ? defaultChannel : '未配置（发送时必须显式给 channel）' })
-      const ok = token !== ''
-      return { ok, plugin: 'dsh-slack', checks }
+      const socket = deps.socketStatusProvider?.()
+      const states = { connecting: '正在连接', connected: '已连接', reconnecting: '已断开，退避重连中', auth_failed: '令牌或权限无效，已停止重连；更新 App-Level Token 后重启插件', stopped: '已停止' }
+      if (appToken !== '') checks.push({ name: 'Socket Mode', ok: socket?.state === 'connected', detail: socket ? states[socket.state] + (socket.error ? '（' + socket.error + '）' : '') : '仅检查配置，尚未确认连接' })
+      const ok = token !== '' && checks.every(check => check.ok === true)
+      return { ok, plugin: 'dsh-slack', checks, ...(socket ? { socket } : {}) }
     },
   }
 }

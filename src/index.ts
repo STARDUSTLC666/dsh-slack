@@ -8,7 +8,7 @@ import { parseConfig, requireToken, resolveAppToken, resolveToken, type SlackCon
 import { createWebSlackClient, type SlackClient } from './slack-client.js'
 import { buildChannelsTool, buildInboxTool, buildNotifyTool, buildHealthTool, buildReplyTool, type ToolDeps } from './tools.js'
 import { createInboxQueue } from './inbox.js'
-import { startSocketModeClient } from './socket.js'
+import { startSocketModeClient, type SocketDisposer } from './socket.js'
 import type { SlackContext } from './types.js'
 
 export const name = 'dsh-slack'
@@ -37,7 +37,7 @@ export {
 } from './slack-client.js'
 export { buildNotifyTool, buildChannelsTool, buildInboxTool, buildReplyTool, type ToolDeps } from './tools.js'
 export { parseMessageEvent, InboxQueue, createInboxQueue, INBOX_CAPACITY, type InboxMessage } from './inbox.js'
-export { startSocketModeClient, type SocketMessageHandler } from './socket.js'
+export { startSocketModeClient, type SocketMessageHandler, type SocketStatus, type SocketDisposer, type SocketLifecycleOptions } from './socket.js'
 export type { SlackContext, ToolDefinition, ToolOutputDefinition, ContentBlock } from './types.js'
 
 /**
@@ -96,11 +96,12 @@ export function apply(ctx: SlackContext, rawConfig: unknown): void {
   }
   const inboxProvider = (): ReturnType<typeof createInboxQueue> => inboxQueue
 
-  const deps: ToolDeps = { clientProvider, configProvider, inboxProvider }
+  let socket: SocketDisposer | undefined
+  const deps: ToolDeps = { clientProvider, configProvider, inboxProvider, socketStatusProvider: () => socket?.status() }
 
   const appToken = resolveAppToken(config)
   if (appToken !== '' && appToken.startsWith('xapp-')) {
-    const startSocket = (): (() => void) => startSocketModeClient(appToken, {
+    const startSocket = (): (() => void) => socket = startSocketModeClient(appToken, {
       onMessage(message) {
         inboxQueue.push(message)
       },
@@ -108,7 +109,8 @@ export function apply(ctx: SlackContext, rawConfig: unknown): void {
     if (typeof ctx.effect === 'function') {
       ctx.effect(startSocket)
     } else {
-      startSocket()
+      const dispose = startSocket()
+      ctx.on?.('dispose', dispose)
     }
   }
 

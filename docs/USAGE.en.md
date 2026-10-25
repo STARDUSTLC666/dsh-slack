@@ -2,6 +2,10 @@
 
 [Overview](../README.en.md) · [Changelog](../CHANGELOG.md) · [Validation](VALIDATION.md)
 
+## Connection diagnostics
+
+Configured credentials do not prove an active inbox connection. slack_health reports connection state. Transient failures back off; invalid credentials and permanent authorization errors stop retries. Reload after correcting credentials. Sends are not retried implicitly.
+
 ## Current improvements
 
 slack_inbox with limit=10 and markRead=true returns remaining; call again for unread messages. After a timeout or missing ts, inspect the channel before retrying to avoid duplicate notifications.
