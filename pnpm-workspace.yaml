@@ -2,4 +2,4 @@ minimumReleaseAgeExclude:
   - "@slack/socket-mode@3.1.0"
   - "@slack/types@3.2.0"
   - "@slack/web-api@8.2.0"
-  - "@stardustlc/dsh-updates@0.1.0"
+  - "@stardustlc/dsh-updates@0.1.0 || 0.1.1"
