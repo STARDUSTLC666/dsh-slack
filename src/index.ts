@@ -1,3 +1,4 @@
+import { registerUpdates } from '@stardustlc/dsh-updates'
 /**
  * dsh-slack：DSH 社区 Slack 通知/桥接插件。
  * v0.2 新增 Socket Mode 双向：slack_inbox 收消息、slack_reply 线程回复。
@@ -46,6 +47,8 @@ export type { SlackContext, ToolDefinition, ToolOutputDefinition, ContentBlock }
  * appToken 存在时启动 Socket Mode（ctx.effect 管理生命周期，dispose 时断开）。
  */
 export function apply(ctx: SlackContext, rawConfig: unknown): void {
+  registerUpdates(ctx, { name: "dsh-slack" })
+
   const warn = (message: string, ...args: unknown[]): void => {
     const logger = ctx.logger
     if (logger !== undefined && typeof logger.warn === 'function') {

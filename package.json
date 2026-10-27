@@ -1,6 +1,6 @@
 {
   "name": "dsh-slack",
-  "version": "0.3.5",
+  "version": "0.4.0",
   "description": "连接 Slack，发送通知并处理 Socket Mode 收件箱与线程回复。",
   "type": "module",
   "main": "./lib/index.js",
@@ -11,7 +11,8 @@
       "default": "./lib/index.js"
     },
     "./package.json": "./package.json",
-    "./cordis.patch.yml": "./cordis.patch.yml"
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./client": "./lib/update-client.js"
   },
   "files": [
     "lib",
@@ -25,10 +26,18 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/build-updates.mjs",
     "test": "pnpm run build && node --test \"test/*.test.mjs\"",
     "prepublishOnly": "pnpm run build",
     "test:protocol": "node test/protocol-acceptance.mjs"
@@ -36,7 +45,8 @@
   "dependencies": {
     "@slack/socket-mode": "^3.1.0",
     "@slack/web-api": "^8.0.0",
-    "undici": "^7.0.0 || ^8.0.0"
+    "undici": "^7.0.0 || ^8.0.0",
+    "@stardustlc/dsh-updates": "0.1.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
@@ -58,6 +68,7 @@
   ],
   "packageManager": "pnpm@11.7.0",
   "engines": {
-    "node": "^22.19.0 || >=24.0.0"
+    "node": "^22.19.0 || >=24.0.0",
+    "dsh": ">=0.2.1-rc.3"
   }
 }
