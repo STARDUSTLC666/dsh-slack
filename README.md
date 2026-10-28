@@ -4,7 +4,7 @@
 
 ![dsh-slack 鲸鱼娘插件封面](https://raw.githubusercontent.com/STARDUSTLC666/dsh-slack/main/assets/cover-whale-girl.png)
 
-连接 Slack，发送通知并处理 Socket Mode 收件箱与线程回复。
+连接 Slack，让 DSH 发送任务通知、读取 Socket Mode 收件箱并在线程中回复。支持账号状态自检与受控重连；认证失效会停止重试并显示原因。
 
 [![npm](https://img.shields.io/npm/v/dsh-slack)](https://www.npmjs.com/package/dsh-slack) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-downloads.svg)](https://www.npmjs.com/package/dsh-slack)
 

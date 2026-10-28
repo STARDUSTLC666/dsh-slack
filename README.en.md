@@ -4,7 +4,7 @@
 
 ![dsh-slack whale girl plugin cover](https://raw.githubusercontent.com/STARDUSTLC666/dsh-slack/main/assets/cover-whale-girl.png)
 
-Connect Slack for notifications, a Socket Mode inbox and thread replies.
+Connect Slack to DSH for task notifications, a Socket Mode inbox and thread replies. Includes account health checks and controlled reconnection, stopping retries with a clear status when authentication fails.
 
 [![npm](https://img.shields.io/npm/v/dsh-slack)](https://www.npmjs.com/package/dsh-slack) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-downloads.svg)](https://www.npmjs.com/package/dsh-slack)
 
