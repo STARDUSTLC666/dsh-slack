@@ -6,7 +6,9 @@
 
 Connect Slack to DSH for task notifications, a Socket Mode inbox and thread replies. Includes account health checks and controlled reconnection, stopping retries with a clear status when authentication fails.
 
-[![npm](https://img.shields.io/npm/v/dsh-slack)](https://www.npmjs.com/package/dsh-slack) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-downloads.svg)](https://www.npmjs.com/package/dsh-slack)
+[![npm](https://img.shields.io/npm/v/dsh-slack)](https://www.npmjs.com/package/dsh-slack) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-downloads.svg)](https://www.npmjs.com/package/dsh-slack) [![total downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-total-downloads.svg)](https://www.npmjs.com/package/dsh-slack)
+
+[Download statistics](https://github.com/STARDUSTLC666/dsh-suite/blob/npm-downloads/README.md)
 
 Feedback and contributions are welcome: report [issues](https://github.com/STARDUSTLC666/dsh-slack/issues) or submit [pull requests](https://github.com/STARDUSTLC666/dsh-slack/pulls).
 
@@ -28,7 +30,10 @@ For the web version, replace `desktop` with `web`. Restart DSH after installatio
 
 ## Start using it
 
-Configure your Slack App and tokens, then ask to review the inbox and identify messages that need a reply.
+1. Configure permissions and Socket Mode for your Slack App, and obtain Bot and App-level tokens.
+2. Enter the tokens in DSH Slack settings and check the connection state.
+3. Verify incoming messages in your own test channel before asking for summaries or thread replies.
+4. Verify the channel, thread and text before sending. Check Slack for the result and inspect connection state before retrying.
 
 ## Requirements and configuration
 

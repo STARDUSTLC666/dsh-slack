@@ -6,7 +6,9 @@
 
 连接 Slack，让 DSH 发送任务通知、读取 Socket Mode 收件箱并在线程中回复。支持账号状态自检与受控重连；认证失效会停止重试并显示原因。
 
-[![npm](https://img.shields.io/npm/v/dsh-slack)](https://www.npmjs.com/package/dsh-slack) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-downloads.svg)](https://www.npmjs.com/package/dsh-slack)
+[![npm](https://img.shields.io/npm/v/dsh-slack)](https://www.npmjs.com/package/dsh-slack) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-downloads.svg)](https://www.npmjs.com/package/dsh-slack) [![total downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-total-downloads.svg)](https://www.npmjs.com/package/dsh-slack)
+
+[下载统计说明](https://github.com/STARDUSTLC666/dsh-suite/blob/npm-downloads/README.md)
 
 欢迎使用，遇到问题或有改进建议，请提交 [issues](https://github.com/STARDUSTLC666/dsh-slack/issues) 和 [PR](https://github.com/STARDUSTLC666/dsh-slack/pulls)。
 
@@ -28,7 +30,10 @@ dsh plugin --profile desktop add dsh-slack
 
 ## 开始使用
 
-配置 Slack App 和令牌后，可说：“查看 Slack 收件箱，整理需要回复的消息。”
+1. 为自己的 Slack App 配置权限与 Socket Mode，取得 Bot token 和 App-level token。
+2. 在 DSH 的 Slack 设置中填写令牌并检查连接状态。
+3. 先在自己的测试频道验证收件，再让助手整理消息或准备线程回复。
+4. 核对目标频道、线程和正文后发送；在 Slack 中检查结果，断线时先看状态再重试。
 
 ## 依赖与配置
 
