@@ -1,32 +1,35 @@
-# dsh-slack
+**简体中文** · [English](README.en.md)
 
-[English](README.en.md)
+# Slack
 
-![dsh-slack 鲸鱼娘插件封面](https://raw.githubusercontent.com/STARDUSTLC666/dsh-slack/main/assets/cover-whale-girl.png)
-
-连接 Slack，让 DSH 发送任务通知、读取 Socket Mode 收件箱并在线程中回复。支持账号状态自检与受控重连；认证失效会停止重试并显示原因。
+**让任务通知和线程回复回到 Slack。**
 
 [![npm](https://img.shields.io/npm/v/dsh-slack)](https://www.npmjs.com/package/dsh-slack) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-downloads.svg)](https://www.npmjs.com/package/dsh-slack) [![total downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-total-downloads.svg)](https://www.npmjs.com/package/dsh-slack)
 
-[下载统计说明](https://github.com/STARDUSTLC666/dsh-suite/blob/npm-downloads/README.md)
+**[安装使用](#安装) · [使用流程](#开始使用) · [完整说明](https://github.com/STARDUSTLC666/dsh-slack/blob/main/docs/REFERENCE.zh.md)**
 
-欢迎使用，遇到问题或有改进建议，请提交 [issues](https://github.com/STARDUSTLC666/dsh-slack/issues) 和 [PR](https://github.com/STARDUSTLC666/dsh-slack/pulls)。
+<picture>
+  <source media="(prefers-color-scheme: dark) and (max-width: 640px)" srcset="https://raw.githubusercontent.com/STARDUSTLC666/dsh-slack/main/docs/assets/intro/workflow-zh-mobile-dark.svg">
+  <source media="(max-width: 640px)" srcset="https://raw.githubusercontent.com/STARDUSTLC666/dsh-slack/main/docs/assets/intro/workflow-zh-mobile-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/STARDUSTLC666/dsh-slack/main/docs/assets/intro/workflow-zh-dark.svg">
+  <img src="https://raw.githubusercontent.com/STARDUSTLC666/dsh-slack/main/docs/assets/intro/workflow-zh-light.svg" alt="让任务通知和线程回复回到 Slack。 · 流程示意" width="100%">
+</picture>
 
 ## 功能
 
-- 向频道或线程发送 Markdown 通知。
-- 读取机器人可见频道和 Socket Mode 收件箱。
-- 回复线程，按配置检查连接与令牌。
+- 发送频道通知或线程回复。
+- 使用机器人可见频道与 Socket Mode 收件箱。
+- 检查连接状态，按原因处理失效与重连。
 
 ## 安装
 
-桌面版可在「插件」面板按包名 `dsh-slack` 安装。已配置 dsh 命令时也可使用：
+在 DSH 桌面版「插件」面板安装 `dsh-slack`。已配置命令行时也可使用：
 
 ```bash
 dsh plugin --profile desktop add dsh-slack
 ```
 
-网页版把命令中的 `desktop` 改为 `web`。安装后重启 DSH。
+网页版把 `desktop` 改为 `web`；安装后重启对应的 DSH。宿主要求以包声明 `>=0.2.1-rc.3` 为准。
 
 ## 开始使用
 
@@ -35,25 +38,32 @@ dsh plugin --profile desktop add dsh-slack
 3. 先在自己的测试频道验证收件，再让助手整理消息或准备线程回复。
 4. 核对目标频道、线程和正文后发送；在 Slack 中检查结果，断线时先看状态再重试。
 
-## 依赖与配置
+可以这样说：
 
-需要 Bot Token。Socket Mode 收消息还需要 App Token 与相应权限；收件箱在内存中保存。
+> 先检查 Slack 连接，准备一条项目进展通知，确认频道和正文后再发送。
 
-详细配置、工具参数与排错见[使用说明](docs/USAGE.md)。从源码独立开发时，Node 要求以 [package.json](package.json) 为准。
+## 开始前要知道
 
-## 文档
+需要自己的 Slack App、权限和令牌；只能访问机器人有权看到的消息。
 
-- [使用与排错](docs/USAGE.md)
-- [更新记录](CHANGELOG.md)
-- [验证范围与历史记录](docs/VALIDATION.md)
-- [问题反馈与功能建议](https://github.com/STARDUSTLC666/dsh-slack/issues)
+配置、完整工具与排错见[详细使用说明](https://github.com/STARDUSTLC666/dsh-slack/blob/main/docs/REFERENCE.zh.md)。
 
 ## 插件更新
 
-需要 DSH 0.2.1-rc.3 或更新版本。更新控件直接位于原有工作台内容末尾；没有工作台的插件，位于原生插件详情页底部。检查、更新记录和偏好在原地展开，不增加独立更新页面或设置菜单。自动检查默认开启；**自动安装默认关闭**，明确授权后才会在空闲且没有未保存修改时安装兼容的稳定补丁。开关按插件独立保存，可关闭、推迟或忽略提醒；不会强制重启 DSH、升级 DSH 本体或替换本地源码安装。Suite 组件在当前页面底部明确说明并操作 Suite 整包更新。
+在工作台或原生插件详情页底部检查更新。默认自动检查，**默认不自动安装**；是否安装、何时重启由你决定。Suite 管理的组件随整包更新。[查看更新规则](https://github.com/STARDUSTLC666/dsh-slack/blob/main/docs/REFERENCE.zh.md)。
 
-旧版用户先在官方插件管理中手动更新一次，之后才会获得此入口。发布到 npm 不会直接替换用户已经安装的版本。
+## 文档
+
+- [详细使用、配置与边界](https://github.com/STARDUSTLC666/dsh-slack/blob/main/docs/REFERENCE.zh.md)
+- [更新记录](https://github.com/STARDUSTLC666/dsh-slack/blob/main/CHANGELOG.md)
+- [验证范围与历史](https://github.com/STARDUSTLC666/dsh-slack/blob/main/docs/VALIDATION.md)
+
+## 反馈与贡献
+
+如果插件帮到了你，欢迎 Star，让更多人发现它。问题和建议请提交 [Issues](https://github.com/STARDUSTLC666/dsh-slack/issues)，也欢迎代码与文档 [PR](https://github.com/STARDUSTLC666/dsh-slack/pulls)。反馈时附上版本与复现步骤，并移除凭据。
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/STARDUSTLC666/dsh-slack/blob/main/LICENSE)
+
+<a id="依赖与配置"></a>

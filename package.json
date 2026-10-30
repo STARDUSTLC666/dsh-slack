@@ -1,7 +1,7 @@
 {
   "name": "dsh-slack",
-  "version": "0.4.6",
-  "description": "DSH Slack 工具：通知、Socket Mode 收件箱、线程回复、连接状态与受控重连。欢迎提交 issues 和 PR。",
+  "version": "0.4.7",
+  "description": "让任务通知和线程回复回到 Slack。 需要自己的 Slack App、权限和令牌 欢迎提交 issues 和 PR。",
   "type": "module",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
