@@ -1,9 +1,16 @@
 # 更新记录
 
-## 0.4.7 (2026-11-03)
+## 0.4.8 (2026-11-03)
 
 - 空 inbox 按 token/格式/Socket/空闲分支精确诊断。
 - Empty inbox diagnosis distinguishes token, format, Socket Mode and idle states.
+
+## 0.4.7 (2026-10-30)
+
+- 重整中英文首页：用途、三步流程图、安装入口与操作示例；详细配置与边界集中到完整说明。
+- 保留下载统计、独立更新选择、问题反馈和贡献入口；原封面与运行功能保留。
+- Refresh bilingual landing pages, workflow artwork, quick starts and reference navigation.
+
 
 ## 0.4.6 (2026-10-30)
 
