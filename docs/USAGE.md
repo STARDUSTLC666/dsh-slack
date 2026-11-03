@@ -188,6 +188,19 @@ pnpm test      # 先 build，再用 node:test 跑 test/*.test.mjs
 - 运行时：`@slack/web-api`（官方 WebClient）、`@slack/socket-mode`（Socket Mode 客户端）
 - peer（由宿主提供，插件运行时不直接 import）：`@deepseek-ai/cordis`、`@deepseek-ai/dsh-tools`
 
+## 故障排查
+
+先运行 `slack_health`：它检查 botToken / appToken / 默认频道与 Socket Mode 状态，不额外发起网络请求。
+
+| 现象 | 常见原因 | 处理 |
+| :-- | :-- | :-- |
+| `invalid_auth` | token 无效、被撤销或写错 | 重新生成 Bot Token，更新配置或 `DSH_SLACK_TOKEN` 后重启 |
+| `channel_not_found` | 频道名/ID 不对，或机器人看不到该频道 | 用 `slack_channels` 查真实频道（输出带频道 ID） |
+| `not_in_channel` | 机器人没加入频道 | 在 Slack 里邀请 App 进入频道 |
+| `missing_scope` / `token_revoked` | 权限不足或 App 被卸载重装 | 补 `chat:write`、`channels:read` 后重装 App 拿新 token |
+| `slack_inbox` 一直为空 | appToken 缺失/格式错、Socket 未连接，或没订阅事件 | 按空态提示逐项排查；App 需开启 Socket Mode 并订阅 `message.channels` / `message.im` |
+| `ratelimited` | 触发 Slack 限流 | 等几秒后重试 |
+
 ## License
 
 MIT

@@ -77,6 +77,15 @@ function clampLimit(value: unknown): number {
   return Math.min(50, Math.max(1, Math.trunc(value)))
 }
 
+/** Socket Mode 状态 → 用户可读文案（自检与收件箱共用，避免两处各写一份）。 */
+const SOCKET_STATE_LABELS: Record<string, string> = {
+  connecting: '正在连接',
+  connected: '已连接',
+  reconnecting: '已断开，退避重连中',
+  auth_failed: '令牌或权限无效，已停止重连；更新 App-Level Token 后重启插件',
+  stopped: '已停止',
+}
+
 /** 自检工具：检查 token / appToken / 默认频道配置，不发起网络请求。 */
 export function buildHealthTool(deps: ToolDeps): ToolDefinition {
   return {
@@ -89,9 +98,17 @@ export function buildHealthTool(deps: ToolDeps): ToolDefinition {
         const rec = (value ?? {}) as Record<string, unknown>
         const rawChecks = Array.isArray(rec.checks) ? rec.checks : []
         const lines = ['dsh-slack 自检' + (rec.ok === true ? '：正常。' : '：发现问题。')]
+        const failed: string[] = []
         for (const item of rawChecks) {
           const c = (item ?? {}) as Record<string, unknown>
           lines.push('- ' + String(c.name) + '：' + (c.ok === true ? '✅ ' + String(c.detail ?? '') : '❌ ' + String(c.detail ?? '')))
+          if (c.ok !== true) failed.push(String(c.name))
+        }
+        if (failed.length > 0) {
+          lines.push('', '下一步：')
+          if (failed.includes('botToken')) lines.push('  · botToken 未配置：在 profile 的 cordis.patch.yml 覆盖 dsh-slack 行填 token，或设置环境变量 DSH_SLACK_TOKEN 后重启。')
+          if (failed.includes('Socket Mode')) lines.push('  · Socket Mode 未连上：确认 App-Level Token 为 xapp- 开头、App 已开启 Socket Mode 并订阅 message.channels / message.im；invalid_auth 需要重新生成令牌。')
+          lines.push('  · 改完配置重启 DSH，再运行 slack_health 复查。')
         }
         return [textBlock(lines.join('\n'))]
       },
@@ -106,8 +123,7 @@ export function buildHealthTool(deps: ToolDeps): ToolDefinition {
       const defaultChannel = resolveDefaultChannel(config)
       checks.push({ name: '默认频道', ok: true, detail: defaultChannel !== '' ? defaultChannel : '未配置（发送时必须显式给 channel）' })
       const socket = deps.socketStatusProvider?.()
-      const states = { connecting: '正在连接', connected: '已连接', reconnecting: '已断开，退避重连中', auth_failed: '令牌或权限无效，已停止重连；更新 App-Level Token 后重启插件', stopped: '已停止' }
-      if (appToken !== '') checks.push({ name: 'Socket Mode', ok: socket?.state === 'connected', detail: socket ? states[socket.state] + (socket.error ? '（' + socket.error + '）' : '') : '仅检查配置，尚未确认连接' })
+      if (appToken !== '') checks.push({ name: 'Socket Mode', ok: socket?.state === 'connected', detail: socket ? SOCKET_STATE_LABELS[socket.state] + (socket.error ? '（' + socket.error + '）' : '') : '仅检查配置，尚未确认连接' })
       const ok = token !== '' && checks.every(check => check.ok === true)
       return { ok, plugin: 'dsh-slack', checks, ...(socket ? { socket } : {}) }
     },
@@ -130,7 +146,7 @@ export function buildNotifyTool(deps: ToolDeps): ToolDefinition {
     schema: NOTIFY_OUTPUT_SCHEMA,
     render: (_args, value) => {
       const v = value as { ts: string; channel: string }
-      return [textBlock('已发送到 ' + v.channel + '（消息 ts：' + v.ts + '）。')]
+      return [textBlock('已发送到 ' + v.channel + '（消息 ts：' + v.ts + '）。需要在同一条消息下继续讨论时，把这个 ts 作为 slack_reply 的 thread_ts。')]
     },
   }
 
@@ -170,9 +186,10 @@ export function buildChannelsTool(deps: ToolDeps): ToolDefinition {
     render: (_args, value) => {
       const v = value as { channels: Array<{ id: string; name: string }> }
       if (v.channels.length === 0) {
-        return [textBlock('机器人当前看不到任何频道（可能需要先把 App 加入频道）。')]
+        return [textBlock('机器人当前看不到任何频道（可能需要先把 App 加入频道）。下一步：在 Slack 里用 /invite @你的机器人 把 App 加进目标频道，或检查 App 是否勾选了 channels:read 权限，然后重新调用 slack_channels。')]
       }
-      const names = v.channels.map((c) => '#' + c.name).join('、')
+      // 带上频道 ID：私密频道/重名频道只有 ID 是唯一的，slack_notify 和 slack_reply 都接受 ID。
+      const names = v.channels.map((c) => '#' + c.name + '（' + c.id + '）').join('、')
       return [textBlock('机器人可见频道（' + v.channels.length + ' 个）：' + names + '。')]
     },
   }
@@ -206,7 +223,16 @@ export function buildInboxTool(deps: ToolDeps): ToolDefinition {
     render: (_args, value) => {
       const v = value as { messages: InboxMessage[]; remaining?: number }
       if (v.messages.length === 0) {
-        return [textBlock('收件箱为空：尚未开启 Socket Mode（缺少 appToken），或暂未收到新的 Slack 消息。请确认已配置 appToken 并订阅 message.channels / message.im 事件。')]
+        // 「没配 appToken」「Socket 断了」「连着但没消息」三种空收件箱的修法完全不同。
+        const appToken = resolveAppToken(deps.configProvider())
+        const socket = deps.socketStatusProvider?.()
+        let reason: string
+        if (appToken === '') reason = '未配置 App-Level Token（appToken 或环境变量 DSH_SLACK_APP_TOKEN），Socket Mode 不会启动，收件箱永远收不到消息。下一步：在 Slack App 里开启 Socket Mode 并生成 xapp- 开头的 Token，填好后重启插件。'
+        else if (!appToken.startsWith('xapp-')) reason = 'appToken 格式不对（应以 xapp- 开头），Socket Mode 已跳过启动。下一步：重新复制 App-Level Token 并更新配置后重启。'
+        else if (socket === undefined) reason = 'Socket Mode 尚未开始连接（刚启动时可能还没就绪）。下一步：等几秒重试；持续为空请运行 slack_health 检查连接状态。'
+        else if (socket.state !== 'connected') reason = 'Socket Mode 未连接（当前状态：' + (SOCKET_STATE_LABELS[socket.state] ?? socket.state) + '）。下一步：运行 slack_health 看具体原因；网络类问题会自动退避重连，invalid_auth 需要更换 App-Level Token。'
+        else reason = 'Socket Mode 已连接，但队列里暂时没有新消息：只有已订阅事件（message.channels / message.im）且未带 subtype 的消息会进入收件箱。下一步：在 Slack 里再发一条测试消息，或检查 App 的事件订阅。'
+        return [textBlock('收件箱为空：' + reason)]
       }
       const lines = v.messages.map((m) => '[' + m.channel + '] ' + m.user + '（ts: ' + m.ts + '）：' + m.text)
       return [textBlock('收件箱（' + v.messages.length + ' 条，新的在前；剩余未读 ' + (v.remaining ?? 0) + ' 条）：\n' + lines.join('\n'))]
@@ -241,7 +267,7 @@ export function buildReplyTool(deps: ToolDeps): ToolDefinition {
     schema: NOTIFY_OUTPUT_SCHEMA,
     render: (_args, value) => {
       const v = value as { ts: string; channel: string }
-      return [textBlock('已线程回复 ' + v.channel + '（消息 ts：' + v.ts + '）。')]
+      return [textBlock('已线程回复 ' + v.channel + '（回复消息 ts：' + v.ts + '）。如需继续跟进同一线程，继续用原消息的 thread_ts，而不是这条回复的 ts。')]
     },
   }
 

@@ -184,6 +184,19 @@ Roadmap: v0.3 plans to introduce interactive components (buttons/modals) and a p
 - Runtime: `@slack/web-api` (official WebClient), `@slack/socket-mode` (Socket Mode client)
 - peer (provided by the host; not imported directly by the plugin at runtime): `@deepseek-ai/cordis`, `@deepseek-ai/dsh-tools`
 
+## Troubleshooting
+
+Run `slack_health` first: it checks botToken / appToken / default channel and the Socket Mode state without extra network calls.
+
+| Symptom | Usual cause | What to do |
+| :-- | :-- | :-- |
+| `invalid_auth` | Token invalid, revoked, or mistyped | Regenerate the bot token, update the config or `DSH_SLACK_TOKEN`, then restart |
+| `channel_not_found` | Wrong channel name/ID, or the bot cannot see it | Use `slack_channels` (its output includes channel IDs) |
+| `not_in_channel` | Bot has not joined the channel | Invite the app to the channel in Slack |
+| `missing_scope` / `token_revoked` | Missing scopes, or the app was reinstalled | Add `chat:write` and `channels:read`, reinstall the app, use the new token |
+| `slack_inbox` stays empty | appToken missing/malformed, socket not connected, or no event subscriptions | Follow the empty-state hint; the app needs Socket Mode plus `message.channels` / `message.im` |
+| `ratelimited` | Slack rate limit | Wait a few seconds and retry |
+
 ## License
 
 MIT
