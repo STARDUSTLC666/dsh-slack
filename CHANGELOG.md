@@ -1,5 +1,10 @@
 # 更新记录
 
+## 0.4.7 (2026-11-03)
+
+- 空 inbox 按 token/格式/Socket/空闲分支精确诊断。
+- Empty inbox diagnosis distinguishes token, format, Socket Mode and idle states.
+
 ## 0.4.6 (2026-10-30)
 
 - 原生插件列表与详情新增专门生成的鲸鱼娘图标：大头像、独立功能符号、透明留白，适合 30 / 36 px 显示；原封面保留。
