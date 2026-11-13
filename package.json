@@ -1,6 +1,6 @@
 {
   "name": "dsh-slack",
-  "version": "0.4.9",
+  "version": "0.4.10",
   "description": "DSH Slack 工具：通知、Socket Mode 收件箱、线程回复、连接状态与受控重连。欢迎提交 issues 和 PR。",
   "type": "module",
   "main": "./lib/index.js",
@@ -70,7 +70,7 @@
   "packageManager": "pnpm@11.7.0",
   "engines": {
     "node": "^22.19.0 || >=24.0.0",
-    "dsh": ">=0.2.1-rc.3"
+    "dsh": ">=0.2.2-rc.3"
   },
   "icon": "./assets/plugin-icon.webp"
 }
