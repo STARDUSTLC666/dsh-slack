@@ -4,6 +4,8 @@
 
 **让任务通知和线程回复回到 Slack。**
 
+DeepSeek Harness（`>=0.2.2-rc.3`）Slack 集成插件：支持频道通知与线程回复、Socket Mode 双向消息收件箱、连接健康诊断与受控重连，并在 Cordis 热重载时自动清理工具注册。
+
 [![npm](https://img.shields.io/npm/v/dsh-slack)](https://www.npmjs.com/package/dsh-slack) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-downloads.svg)](https://www.npmjs.com/package/dsh-slack) [![total downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-total-downloads.svg)](https://www.npmjs.com/package/dsh-slack)
 
 **[安装使用](#安装) · [使用流程](#开始使用) · [完整说明](https://github.com/STARDUSTLC666/dsh-slack/blob/main/docs/REFERENCE.zh.md)**

@@ -4,6 +4,8 @@
 
 **Bring task notifications and thread replies to Slack.**
 
+Slack integration plugin for DeepSeek Harness (`>=0.2.2-rc.3`): supports channel notifications, thread replies, optional Socket Mode inbox reception, health diagnostics, and Cordis hot-reload cleanup.
+
 [![npm](https://img.shields.io/npm/v/dsh-slack)](https://www.npmjs.com/package/dsh-slack) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-downloads.svg)](https://www.npmjs.com/package/dsh-slack) [![total downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-total-downloads.svg)](https://www.npmjs.com/package/dsh-slack)
 
 **[Install](#install) · [Workflow](#start-using-it) · [Full guide](https://github.com/STARDUSTLC666/dsh-slack/blob/main/docs/REFERENCE.en.md)**
