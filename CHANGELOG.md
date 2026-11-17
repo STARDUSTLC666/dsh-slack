@@ -1,5 +1,10 @@
 # 更新记录
 
+## 0.4.12 (2026-11-18)
+
+- 深度适配 DSH 0.2.2：补齐 manifestVersion 1 与双语元数据；新增 Cordis 4 `ctx.effect` 工具卸载清理，并为只读查询与健康检查工具声明并发安全。
+- Deeply adapt to DSH 0.2.2: add manifestVersion 1 and bilingual locale metadata; add Cordis 4 `ctx.effect` tool unregistration and mark read-only query/health tools concurrency-safe.
+
 ## 0.4.11 (2026-11-17)
 
 - 在原生插件详情页单独检查和安装兼容版本。自动安装默认关闭，可为该插件开启空闲时的稳定补丁更新。

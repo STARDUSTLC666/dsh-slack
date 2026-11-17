@@ -18,6 +18,7 @@ export interface ToolDefinition {
     description: string;
     parameters: unknown;
     readonly output: ToolOutputDefinition;
+    isConcurrencySafe?(args?: unknown): boolean;
     execute(args: unknown, exec?: unknown): Promise<unknown>;
     timeoutMs?: number;
 }
@@ -27,7 +28,7 @@ export interface SlackContext {
         register(definition: ToolDefinition): () => void;
     };
     /** Cordis 生命周期：传入启动函数，其返回的清理函数在 dispose 时执行。 */
-    effect?: (start: () => void | (() => void)) => void;
+    effect?: (start: () => void | (() => void), label?: string) => void;
     on?: (event: 'dispose', listener: () => void) => unknown;
     /** 可选日志器；缺省回退 console.warn。 */
     logger?: {

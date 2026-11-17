@@ -43,3 +43,15 @@ test('配置缺失时 execute 抛中文 token 错误', async () => {
   const notify = ctx.registered.find((t) => t.name === 'slack_notify')
   await assert.rejects(() => notify.execute({ channel: '#general', text: 'hi' }), /token 未配置/)
 })
+
+test('Cordis 4 ctx.effect 卸载时清理全部已注册工具', () => {
+  const active = new Set()
+  const effects = []
+  apply({
+    tools: { register: (def) => { active.add(def.name); return () => active.delete(def.name) } },
+    effect: (fn) => { effects.push(fn()) },
+  }, { token: 'xoxb-test', defaultChannel: '#general' })
+  assert.equal(active.size, 5)
+  for (const dispose of effects) dispose?.()
+  assert.equal(active.size, 0)
+})

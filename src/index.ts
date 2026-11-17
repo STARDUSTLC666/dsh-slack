@@ -117,9 +117,23 @@ export function apply(ctx: SlackContext, rawConfig: unknown): void {
     }
   }
 
-  ctx.tools.register(buildNotifyTool(deps))
-  ctx.tools.register(buildChannelsTool(deps))
-  ctx.tools.register(buildInboxTool(deps))
-  ctx.tools.register(buildReplyTool(deps))
-  ctx.tools.register(buildHealthTool(deps))
+  const disposers: Array<() => void> = []
+  for (const definition of [
+    buildNotifyTool(deps),
+    buildChannelsTool(deps),
+    buildInboxTool(deps),
+    buildReplyTool(deps),
+    buildHealthTool(deps),
+  ]) {
+    const dispose = ctx.tools.register(definition)
+    if (typeof dispose === 'function') disposers.push(dispose)
+  }
+  const teardownTools = () => {
+    for (const dispose of disposers) dispose()
+  }
+  if (typeof ctx.effect === 'function') {
+    ctx.effect(() => teardownTools, 'slack.tools()')
+  } else {
+    ctx.on?.('dispose', teardownTools)
+  }
 }

@@ -1,6 +1,6 @@
 {
   "name": "dsh-slack",
-  "version": "0.4.11",
+  "version": "0.4.12",
   "description": "DSH Slack 工具：通知、Socket Mode 收件箱、线程回复、连接状态与受控重连。欢迎提交 issues 和 PR。",
   "type": "module",
   "main": "./lib/index.js",
@@ -12,7 +12,9 @@
     },
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
-    "./client": "./lib/update-client.js"
+    "./client": "./lib/update-client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./assets/plugin-icon.webp"
   },
   "files": [
     "lib",
@@ -21,10 +23,12 @@
     "README.en.md",
     "docs",
     "CHANGELOG.md",
-    "assets/plugin-icon.webp"
+    "assets/plugin-icon.webp",
+    "locale"
   ],
   "license": "MIT",
   "dsh": {
+    "manifestVersion": 1,
     "bundle": {
       "patch": "./cordis.patch.yml"
     },

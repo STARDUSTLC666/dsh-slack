@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Slack",
+    "description": "Send Slack channel notifications, post thread replies, and optionally receive messages via Socket Mode."
+  }
+}

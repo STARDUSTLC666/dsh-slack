@@ -90,6 +90,7 @@ const SOCKET_STATE_LABELS: Record<string, string> = {
 export function buildHealthTool(deps: ToolDeps): ToolDefinition {
   return {
     name: 'slack_health',
+    isConcurrencySafe: () => true,
     description: 'dsh-slack 自检：检查 botToken / appToken / 默认频道配置和当前 Socket Mode 连接状态（不额外发起网络请求）。遇到问题时先运行本工具定位。',
     parameters: compileParameters({}),
     output: {
@@ -196,6 +197,7 @@ export function buildChannelsTool(deps: ToolDeps): ToolDefinition {
 
   return {
     name: 'slack_channels',
+    isConcurrencySafe: () => true,
     description: '列出当前 Slack 机器人可见的频道（conversations.list）。',
     parameters,
     output,
@@ -241,6 +243,7 @@ export function buildInboxTool(deps: ToolDeps): ToolDefinition {
 
   return {
     name: 'slack_inbox',
+    isConcurrencySafe: (args) => (args as { markRead?: unknown } | undefined)?.markRead !== true,
     description: '读取通过 Socket Mode 收到的 Slack 消息（内存队列，最多保留 200 条，新的在前）。',
     parameters,
     output,
