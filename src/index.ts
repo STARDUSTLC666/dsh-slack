@@ -6,14 +6,17 @@ import { registerUpdates } from '@stardustlc/dsh-updates'
  */
 
 import { parseConfig, requireToken, resolveAppToken, resolveToken, type SlackConfig } from './config.js'
+import { Config as SlackConfigSchema, liveConfig } from './host-config.js'
 import { createWebSlackClient, type SlackClient } from './slack-client.js'
 import { buildChannelsTool, buildInboxTool, buildNotifyTool, buildHealthTool, buildReplyTool, type ToolDeps } from './tools.js'
 import { createInboxQueue } from './inbox.js'
 import { startSocketModeClient, type SocketDisposer } from './socket.js'
 import type { SlackContext } from './types.js'
 
+export const Config = SlackConfigSchema
 export const name = 'dsh-slack'
 export const inject = ['tools']
+export { liveConfig, createVolatile, HostValidationError, type HostSchemaNode, type HostSchemaMeta, type VolatileRef } from './host-config.js'
 
 export { compileParameters, type ParameterDsl, type ParameterDslMap, type JsonSchemaNode } from './compile.js'
 export {
@@ -58,19 +61,31 @@ export function apply(ctx: SlackContext, rawConfig: unknown): void {
     }
   }
 
+  const liveRaw: unknown = typeof rawConfig === 'object' && rawConfig !== null && !Array.isArray(rawConfig)
+    ? liveConfig(rawConfig as Record<string, unknown>)
+    : rawConfig
+
+  const readConfig = (): SlackConfig | undefined => {
+    try {
+      return parseConfig(liveRaw)
+    } catch {
+      return undefined
+    }
+  }
+
   let config: SlackConfig | undefined
   try {
-    config = parseConfig(rawConfig)
+    config = parseConfig(liveRaw)
   } catch (error) {
     warn('[dsh-slack] 配置解析失败，工具将在调用时报错：', error)
     config = undefined
   }
 
   if (config === undefined) {
-    warn('[dsh-slack] 配置缺失或格式错误：slack_notify / slack_channels / slack_inbox / slack_reply 已注册，但调用时会报错。请在 profile 的 cordis.patch.yml 配置 slack 行并重启。')
+    warn('[dsh-slack] 配置缺失或格式错误：slack_notify / slack_channels / slack_inbox / slack_reply 已注册，但调用时会报错。可在 DSH「设置 → 插件 → Slack」或 profile 的 cordis.patch.yml 填写配置。')
   } else {
     if (!resolveToken(config)) {
-      warn('[dsh-slack] 未检测到 Slack 令牌（config.token 与 DSH_SLACK_TOKEN 均为空）：slack_notify / slack_channels / slack_reply 调用时会报错。')
+      warn('[dsh-slack] 未检测到 Slack 令牌（config.token 与 DSH_SLACK_TOKEN 均为空）：可在 DSH「设置 → 插件 → Slack」填写 token（保存即生效）。')
     }
     const appToken = resolveAppToken(config)
     if (!appToken) {
@@ -82,13 +97,13 @@ export function apply(ctx: SlackContext, rawConfig: unknown): void {
 
   const inboxQueue = createInboxQueue()
 
-  const configProvider = (): SlackConfig | undefined => config
+  const configProvider = (): SlackConfig | undefined => readConfig()
   let client: SlackClient | undefined
   let clientFingerprint = ''
   const clientProvider = (): SlackClient => {
-    // 每次调用时重新解析配置（config.token 优先，环境变量回退）。
+    // 每次调用时重新解析活引用配置（config.token 优先，环境变量回退）。
     // 同一 token/API 地址复用 WebClient；配置变更时自动重建。
-    const current = parseConfig(rawConfig)
+    const current = readConfig()
     const token = requireToken(current)
     const fingerprint = token + '\u0000' + (current?.slackApiUrl ?? '')
     if (client === undefined || fingerprint !== clientFingerprint) {

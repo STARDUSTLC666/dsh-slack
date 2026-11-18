@@ -67,7 +67,7 @@ export function requireToken(config: SlackConfig | undefined): string {
   if (!token) {
     throw new Error(
       'token 未配置：缺少 Slack 机器人令牌（xoxb-）或用户令牌（xoxp-）。'
-      + '请在 profile 的 cordis.patch.yml 覆盖 slack 行的 config.token 并重启，或设置环境变量 DSH_SLACK_TOKEN。',
+      + '可在 DSH「设置 → 插件 → Slack（dsh-slack）」直接填写 token（保存即生效，无需重启），或在 profile 的 cordis.patch.yml 覆盖 slack 行的 config.token，或设置环境变量 DSH_SLACK_TOKEN。',
     )
   }
   return token

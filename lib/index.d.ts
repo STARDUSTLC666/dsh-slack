@@ -1,6 +1,14 @@
+/**
+ * dsh-slack：DSH 社区 Slack 通知/桥接插件。
+ * v0.2 新增 Socket Mode 双向：slack_inbox 收消息、slack_reply 线程回复。
+ * @module dsh-slack
+ */
+import { type SlackConfig } from './config.js';
 import type { SlackContext } from './types.js';
+export declare const Config: import("./host-config.js").HostSchemaNode<Partial<SlackConfig>>;
 export declare const name = "dsh-slack";
 export declare const inject: string[];
+export { liveConfig, createVolatile, HostValidationError, type HostSchemaNode, type HostSchemaMeta, type VolatileRef } from './host-config.js';
 export { compileParameters, type ParameterDsl, type ParameterDslMap, type JsonSchemaNode } from './compile.js';
 export { parseConfig, resolveToken, resolveDefaultChannel, requireToken, resolveAppToken, ENV_TOKEN, ENV_APP_TOKEN, type SlackConfig, } from './config.js';
 export { createWebSlackClient, mapSlackError, assertChannel, assertText, assertThreadTs, type SlackClient, type PostMessageParams, type ChannelInfo, } from './slack-client.js';

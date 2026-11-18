@@ -2,62 +2,40 @@
 
 [返回简介](../README.md) · [更新记录](../CHANGELOG.md) · [验证记录](VALIDATION.md)
 
-## 连接诊断
+## 最快 3 步用起来
 
-凭据已填写不等于收件箱已连接。slack_health 显示真实连接状态；临时故障退避重连，凭据失效或权限错误停止重试。修正凭据后重新加载插件。发送操作不会隐式重试。
+### 第 1 步：创建 Slack App 并获取令牌
 
-## 本次改进
+**如果你只需要发通知 / 线程回复（单向模式，2 分钟配好）：**
+1. 打开 <https://api.slack.com/apps> → **Create New App** → **From scratch**，选择工作区。
+2. 打开左侧 **OAuth & Permissions**，在 **Bot Token Scopes** 下添加：
+   - `chat:write`（发送消息与线程回复必需）
+   - `channels:read`（列出可见公开频道必需；私密频道可加 `groups:read`）
+3. 点击顶部 **Install to Workspace** 完成授权，复制 `xoxb-` 开头的 **Bot User OAuth Token**。
 
-slack_inbox { limit: 10, markRead: true } 返回 remaining，继续调用可查看余下消息。遇到超时或缺少 ts 时先检查频道，确认未发送后再重试，避免重复通知。
+**如果你还需要让助手读取群消息与私信（开启双向 Socket Mode 收件箱，可选）：**
+1. 在同一个 App 左侧打开 **Socket Mode** → 开启 **Enable Socket Mode**，生成带 `connections:write` 权限的 **App-Level Token**（`xapp-` 开头）。
+2. 打开 **Event Subscriptions** → 开启开关，在 **Subscribe to bot events** 添加 `message.channels`（频道消息）与 `message.im`（私信）。
 
-## 功能
+### 第 2 步：在 DSH 中填写配置（两种方式任选）
 
-- `slack_notify`：向指定频道（或线程）发送一条 Markdown 文本消息，返回消息 `ts`。
-- `slack_channels`：列出机器人当前可见的频道（`conversations.list`，自动沿 `next_cursor` 翻页拉全）。
-- `slack_inbox`：读取通过 Socket Mode 收到的消息（内存队列，最多保留 200 条；自动去重，`markRead=true` 原子消费）。
-- `slack_reply`：以线程回复形式回复某条收件箱消息（`chat.postMessage` 带 `thread_ts`）。
-- WebClient 按 `token + slackApiUrl` 缓存复用，配置变更时自动重建。
-- 配置走 `cordis.patch.yml`，令牌支持环境变量回退（`DSH_SLACK_TOKEN` / `DSH_SLACK_APP_TOKEN`）。
+**方式 A（推荐）：DSH 原生设置面板**
 
-## 安装
+打开 **DSH → 设置 → 插件 → Slack（`dsh-slack`）**：
+- 填入 `token`（`xoxb-...`）与可选 `defaultChannel`（如 `#general`），**保存后立即生效，无需重启**；
+- 如启用双向收件箱，填入 `appToken`（`xapp-...`，所有令牌均自动脱敏保护，更新 `appToken` 后重载插件即可建立长连接）。
 
-插件运行在宿主进程内，通过 `dsh plugin` 安装进 profile，重启后生效：
+**方式 B：环境变量或 `cordis.patch.yml`**
 
-```sh
-dsh plugin --profile web add dsh-slack
+```powershell
+# Windows PowerShell
+$env:DSH_SLACK_TOKEN = "xoxb-你的机器人令牌"
+$env:DSH_SLACK_APP_TOKEN = "xapp-你的App级令牌"
 ```
 
-安装后重启你的 dsh Web 服务，`slack_notify` / `slack_channels` / `slack_inbox` / `slack_reply`
-四个工具即对模型可见。
-
-## 配置
-
-配置在 profile 的 `cordis.patch.yml` 里按 `id: slack` 覆盖本插件的行（覆盖会整体替换该行的
-`config`，不会合并）。可用配置项：
-
-| 键 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `token` | string | 是* | Slack 令牌：机器人令牌（`xoxb-`）或用户令牌（`xoxp-`）。留空时回退到环境变量 `DSH_SLACK_TOKEN`。 |
-| `appToken` | string | 否* | App-Level Token（`xapp-` 开头），开启 Socket Mode 后用于接收消息。留空时回退到环境变量 `DSH_SLACK_APP_TOKEN`。 |
-| `defaultChannel` | string | 否 | 默认频道（如 `#general`）。模型未特别指定频道时的默认目标，写进 `channel` 参数说明里。 |
-
-`*` `token` 在「配置层」可留空，此时回退环境变量；两者都为空时插件照常加载，但调用发消息/列频道/
-回复工具时会返回中文报错。`appToken` 留空则只告警、不崩溃，`slack_inbox` 返回空队列（单向模式）。
-
-**方式一：环境变量（推荐，不写死令牌）**
-
-```sh
-# 在启动 dsh 的进程里设置
-export DSH_SLACK_TOKEN=xoxb-你的机器人令牌
-export DSH_SLACK_APP_TOKEN=xapp-你的App级令牌
-```
-
-**方式二：profile 的 cordis.patch.yml 直接覆盖**
-
-在你的 profile 目录（`$DSH_HOME/profiles/web/cordis.patch.yml`）追加：
+或在 `$DSH_HOME/profiles/<name>/cordis.patch.yml` 中配置：
 
 ```yaml
-# 覆盖 dsh-slack 的 slack 行配置（整体替换）
 - id: slack
   config:
     token: 'xoxb-你的机器人令牌'
@@ -65,141 +43,74 @@ export DSH_SLACK_APP_TOKEN=xapp-你的App级令牌
     defaultChannel: '#general'
 ```
 
-> 优先级：`config.token` > 环境变量 `DSH_SLACK_TOKEN`；`config.appToken` > 环境变量
-> `DSH_SLACK_APP_TOKEN`。
+### 第 3 步：拉机器人进频道并自检
 
-### 创建 Slack App 并拿令牌
+在目标 Slack 频道发送 `/invite @你的机器人`，然后在 DSH 对话里让助手检查连接状态即可开始使用。
 
-1. 打开 <https://api.slack.com/apps>，点 **Create New App**（选 `From scratch`，给 App 起名、选工作区）。
-2. 进入 **OAuth & Permissions** 页，在 **Scopes → Bot Token Scopes** 下勾选：
-   - `chat:write`（发消息必需）
-   - `channels:read`（列频道必需）
-3. 回到顶部点 **Install to Workspace**（授权）。
-4. 拿到 **Bot User OAuth Token**（以 `xoxb-` 开头）。
-5. 把机器人（App）加进它要发消息的频道：在频道里 `/invite @你的机器人`（私有频道必需）。
+---
 
-### 开启 Socket Mode（双向收消息）
+## 平时怎么对助手说（可直接复制的自然语言示例）
 
-要接收 Slack 消息（`slack_inbox` / `slack_reply`），需要开启 Socket Mode 并生成 App-Level Token：
+- **连接自检与频道盘点**
+  > 跑一下 Slack 自检，顺便列出机器人现在能看到哪些频道。
+- **任务完成后向指定频道发进展卡片（发前审阅）**
+  > 把今天修复的问题整理成一段清晰的项目进展，准备发到 `#dev-updates`；先把正文给我确认，不要直接发。
+- **在同一条通知下持续追加线程进度**
+  > 先在 `#release` 发一条「开始部署 v1.4」的主消息，等会儿跑完验证后直接在同一条消息的线程里回复部署结果。
+- **整理 Socket Mode 收件箱并起草回复**
+  > 查看 Slack 收件箱里最新的 10 条消息，总结大家提到的阻塞问题，并帮我针对第一条起草线程回复供我审核。
 
-1. 打开 <https://api.slack.com/apps>，进入你的 App。
-2. 左侧 **Socket Mode** 页 → 打开开关（**Enable Socket Mode**）。
-3. 点 **Generate Token and Scopes** 生成 App-Level Token：给 Token 起名，勾选 `connections:write` scope。
-   生成后拿到以 `xapp-` 开头的 App-Level Token（只显示一次，请立即保存）。
-4. 进入 **Event Subscriptions** 页，开启事件订阅，在 **Subscribe to bot events → Add Bot User Event** 添加：
-   - `message.channels`（公开频道消息）
-   - `message.im`（机器人私信）
-5. 把 App-Level Token 配进 `appToken`（或环境变量 `DSH_SLACK_APP_TOKEN`）。
-6. 重启 dsh Web 服务，插件自动通过 Socket Mode 建立连接并开始收消息。
+---
 
-> 未配置 `appToken` 时插件**不会崩溃**：只打印告警，`slack_inbox` 返回空队列（中文提示）。
-> Socket Mode 网络错误由 SDK 自动重连，插件只记录告警、不抛崩。
+## 常见卡点自检
 
-## 卸载
+遇到问题先让助手执行 `slack_health`（同时汇报凭据配置与真实 Socket Mode 连接状态，不发起多余网络请求）：
+
+| 现象 | 常见原因 | 一步修复 |
+| :--- | :--- | :--- |
+| `token 未配置` | 尚未配置 `token` 且无 `DSH_SLACK_TOKEN` | 打开 **DSH「设置 → 插件 → Slack」**填入 `xoxb-...` 并保存（立即生效） |
+| `not_in_channel` | 机器人尚未加入该频道 | 在该 Slack 频道里输入 `/invite @你的机器人` |
+| `channel_not_found` | 频道名拼错，或私密频道需要用频道 ID | 让助手运行 `slack_channels` 查看带频道 ID 的真实列表 |
+| `invalid_auth` / `missing_scope` | 令牌被撤销，或漏勾 `chat:write` / `channels:read` | 在 Slack App 补齐权限后点 **Reinstall to Workspace**，换上新令牌 |
+| `slack_inbox` 一直为空 | 没填 `xapp-` 令牌、Socket 未连接，或未订阅事件 | 按空态提示核对：开启 Socket Mode + 订阅 `message.channels` / `message.im` + 填写 `appToken` |
+| 超时或不确定是否已发出 | 网络抖动，插件绝不自动重发以防刷屏 | **先打开 Slack 频道看一眼是否已发出**，确认未送达再重试 |
+
+---
+
+## 配置项与工具参考
+
+### 配置字段
+
+| 字段 | 必填 | 说明 |
+| :--- | :--- | :--- |
+| `token` | 是* | Slack Bot Token（`xoxb-`）或 User Token（`xoxp-`）；留空时回退 `DSH_SLACK_TOKEN`，支持热生效 |
+| `appToken` | 否 | App-Level Token（`xapp-`），用于 Socket Mode 接收消息；留空时回退 `DSH_SLACK_APP_TOKEN` |
+| `defaultChannel` | 否 | 默认目标频道（如 `#general` 或频道 ID），支持热生效 |
+| `slackApiUrl` | 否 | Slack Web API 基地址（默认 `https://slack.com/api/`，企业网格可覆盖） |
+
+### 注册工具清单
+
+| 工具 | 作用 | 关键参数与说明 |
+| :--- | :--- | :--- |
+| `slack_notify` | 向频道或线程发送 Markdown 消息 | `channel`、`text` 必填，`thread_ts` 可选；返回 `ts` 供线程跟进 |
+| `slack_channels` | 列出机器人可见频道 | 自动翻页拉全，同时展示 `#频道名（频道ID）` |
+| `slack_inbox` | 读取 Socket Mode 内存收件箱 | `limit`（1–50，默认 10）、`markRead`（原子消费已返回消息并返回 `remaining`）；最多缓存 200 条 |
+| `slack_reply` | 在原消息线程下回复 | `channel`、`text`、`thread_ts` 必填 |
+| `slack_health` | 连接与凭据自检 | 区分「凭据已填」与「Socket 真正连上」；鉴权失败自动停止盲目重连 |
+
+## 安装、卸载与开发
 
 ```bash
+# 安装（桌面版把 web 换为 desktop）
+dsh plugin --profile web add dsh-slack
+
+# 卸载
 dsh plugin --profile web remove dsh-slack
+
+# 本地构建与离线测试
+pnpm install
+pnpm test
 ```
-
-卸载后重启 Web 服务。如需彻底清理，可再手动删除自己 profile `cordis.patch.yml` 中的对应插件行。
-
-## 工具清单
-
-### `slack_notify`
-
-向指定频道/线程发送 Markdown 文本（底层 `chat.postMessage`）。
-
-| 参数 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `channel` | string | 是 | 频道名（如 `#general`）或频道 ID。 |
-| `text` | string | 是 | 要发送的 Markdown 文本。 |
-| `thread_ts` | string | 否 | 回复某条消息所在线程的 `ts`。 |
-
-返回：`{ "ts": "...", "channel": "#general" }`（`ts` 供后续 `thread_ts` 引用）。
-
-### `slack_channels`
-
-列出机器人可见频道（底层 `conversations.list`）。
-
-无参数。返回：`{ "channels": [{ "id": "...", "name": "..." }, ...] }`。
-
-### `slack_inbox`
-
-读取通过 Socket Mode 收到的消息（内存队列，最多保留 200 条，新的在前）。
-
-| 参数 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `limit` | integer | 否 | 最多返回的消息数（默认 10，范围 1-50）。 |
-| `markRead` | boolean | 否 | 为 `true` 时，返回后清空收件箱队列（标记已读）。 |
-
-返回：`{ "messages": [{ "ts": "...", "channel": "...", "user": "...", "text": "..." }, ...] }`。
-
-### `slack_reply`
-
-以线程回复形式回复某条收件箱消息（底层 `chat.postMessage` 带 `thread_ts`）。
-
-| 参数 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `channel` | string | 是 | 频道名（如 `#general`）或频道 ID。 |
-| `text` | string | 是 | 回复内容（Markdown 文本）。 |
-| `thread_ts` | string | 是 | 要回复消息的 `ts`（来自 `slack_inbox` 返回的 `ts`）。 |
-
-返回：`{ "ts": "...", "channel": "#general" }`。
-
-## 错误处理
-
-所有错误信息均为中文，模型与用户都能直接读懂：
-
-- 未配置令牌：`token 未配置：缺少 Slack 机器人令牌（xoxb-）…请在 profile 的 cordis.patch.yml 覆盖 slack 行的 config.token 并重启，或设置环境变量 DSH_SLACK_TOKEN。`
-- 未配置 App-Level Token：只告警，`slack_inbox` 返回空队列（含中文提示），不影响其它工具。
-- `invalid_auth`：提示检查/重新生成 token。
-- `channel_not_found`：提示频道名或频道 ID 错误。
-- `not_in_channel`：提示先把机器人 App 邀请进频道。
-- `token_revoked` / `account_inactive` / `missing_scope` / `not_authed`：提示权限或令牌失效，需重新安装 App。
-- `is_archived`：提示频道已归档，不能发消息。
-- `msg_too_long`：提示 Slack 单条消息超过 40,000 字符。
-- `ratelimited`：提示请求太频繁，稍后重试。
-
-## 开发与测试
-
-```sh
-pnpm install   # 安装依赖并触发 prepare（tsc 构建）
-pnpm build     # tsc 编译 src → lib
-pnpm test      # 先 build，再用 node:test 跑 test/*.test.mjs
-```
-
-测试无需真实 token：参数编译、配置解析（含 env 回退）、工具注册（4 个工具 + 缺配置中文报错）、
-注入 fake client 断言 `postMessage` 参数（含 `thread_ts`）、输出 schema 纯 JSON 校验、
-收件箱队列容量/清空/去重/原子 drain、Socket Mode 事件解析（fake event 对象）、appToken 缺失不崩。
-
-## 已知限制与路线图
-
-- **v0.1 是单向通知（agent→Slack）**；**v0.2 通过 Socket Mode 实现双向**（`slack_inbox` / `slack_reply`）。
-- **不支持** RTM、交互组件（按钮/弹窗/slash command 回复）。
-- `slack_inbox` 为进程内存队列：重启即清空，且不持久化；最多保留 200 条，满则丢最旧。
-- `channel` 为必填参数，`defaultChannel` 目前只作为说明提示写入 `channel` 参数描述，不替代
-  必填的 `channel`。
-- 令牌缺失时插件仍会加载（懒加载），错误在工具被调用时才抛出；appToken 缺失则仅告警。
-
-路线图：v0.3 计划引入交互组件（按钮/弹窗）与持久化收件箱。
-
-## 依赖
-
-- 运行时：`@slack/web-api`（官方 WebClient）、`@slack/socket-mode`（Socket Mode 客户端）
-- peer（由宿主提供，插件运行时不直接 import）：`@deepseek-ai/cordis`、`@deepseek-ai/dsh-tools`
-
-## 故障排查
-
-先运行 `slack_health`：它检查 botToken / appToken / 默认频道与 Socket Mode 状态，不额外发起网络请求。
-
-| 现象 | 常见原因 | 处理 |
-| :-- | :-- | :-- |
-| `invalid_auth` | token 无效、被撤销或写错 | 重新生成 Bot Token，更新配置或 `DSH_SLACK_TOKEN` 后重启 |
-| `channel_not_found` | 频道名/ID 不对，或机器人看不到该频道 | 用 `slack_channels` 查真实频道（输出带频道 ID） |
-| `not_in_channel` | 机器人没加入频道 | 在 Slack 里邀请 App 进入频道 |
-| `missing_scope` / `token_revoked` | 权限不足或 App 被卸载重装 | 补 `chat:write`、`channels:read` 后重装 App 拿新 token |
-| `slack_inbox` 一直为空 | appToken 缺失/格式错、Socket 未连接，或没订阅事件 | 按空态提示逐项排查；App 需开启 Socket Mode 并订阅 `message.channels` / `message.im` |
-| `ratelimited` | 触发 Slack 限流 | 等几秒后重试 |
 
 ## License
 

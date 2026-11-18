@@ -107,9 +107,9 @@ export function buildHealthTool(deps: ToolDeps): ToolDefinition {
         }
         if (failed.length > 0) {
           lines.push('', '下一步：')
-          if (failed.includes('botToken')) lines.push('  · botToken 未配置：在 profile 的 cordis.patch.yml 覆盖 dsh-slack 行填 token，或设置环境变量 DSH_SLACK_TOKEN 后重启。')
-          if (failed.includes('Socket Mode')) lines.push('  · Socket Mode 未连上：确认 App-Level Token 为 xapp- 开头、App 已开启 Socket Mode 并订阅 message.channels / message.im；invalid_auth 需要重新生成令牌。')
-          lines.push('  · 改完配置重启 DSH，再运行 slack_health 复查。')
+          if (failed.includes('botToken')) lines.push('  · botToken 未配置：在 DSH「设置 → 插件 → Slack（dsh-slack）」直接填写 token（保存即生效，无需重启），或在 profile 的 cordis.patch.yml 覆盖 slack 行，或设置环境变量 DSH_SLACK_TOKEN。')
+          if (failed.includes('Socket Mode')) lines.push('  · Socket Mode 未连上：确认 App-Level Token 为 xapp- 开头、App 已开启 Socket Mode 并订阅 message.channels / message.im；invalid_auth 需要重新生成令牌并在「设置 → 插件 → Slack」更新 appToken。')
+          lines.push('  · 填好后再次运行 slack_health 复查。')
         }
         return [textBlock(lines.join('\n'))]
       },
@@ -118,7 +118,7 @@ export function buildHealthTool(deps: ToolDeps): ToolDefinition {
       const config = deps.configProvider()
       const checks: Array<Record<string, unknown>> = []
       const token = resolveToken(config)
-      checks.push({ name: 'botToken', ok: token !== '', detail: token !== '' ? '已配置' : '未配置：请填 token 或环境变量（发送/频道工具需要）' })
+      checks.push({ name: 'botToken', ok: token !== '', detail: token !== '' ? '已配置' : '未配置：请在 DSH「设置 → 插件 → Slack」填写 token 或设置环境变量 DSH_SLACK_TOKEN（发送/频道工具需要）' })
       const appToken = resolveAppToken(config)
       checks.push({ name: 'appToken', ok: appToken === '' || appToken.startsWith('xapp-'), detail: appToken !== '' ? '已配置（Socket Mode 连接状态见下项）' : '未配置（收件箱功能不可用，通知不受影响）' })
       const defaultChannel = resolveDefaultChannel(config)
@@ -229,7 +229,7 @@ export function buildInboxTool(deps: ToolDeps): ToolDefinition {
         const appToken = resolveAppToken(deps.configProvider())
         const socket = deps.socketStatusProvider?.()
         let reason: string
-        if (appToken === '') reason = '未配置 App-Level Token（appToken 或环境变量 DSH_SLACK_APP_TOKEN），Socket Mode 不会启动，收件箱永远收不到消息。下一步：在 Slack App 里开启 Socket Mode 并生成 xapp- 开头的 Token，填好后重启插件。'
+        if (appToken === '') reason = '未配置 App-Level Token（appToken 或环境变量 DSH_SLACK_APP_TOKEN），Socket Mode 不会启动，收件箱永远收不到消息。下一步：在 Slack App 里开启 Socket Mode 并生成 xapp- 开头的 Token，填进 DSH「设置 → 插件 → Slack」的 appToken（或设置环境变量 DSH_SLACK_APP_TOKEN）。'
         else if (!appToken.startsWith('xapp-')) reason = 'appToken 格式不对（应以 xapp- 开头），Socket Mode 已跳过启动。下一步：重新复制 App-Level Token 并更新配置后重启。'
         else if (socket === undefined) reason = 'Socket Mode 尚未开始连接（刚启动时可能还没就绪）。下一步：等几秒重试；持续为空请运行 slack_health 检查连接状态。'
         else if (socket.state !== 'connected') reason = 'Socket Mode 未连接（当前状态：' + (SOCKET_STATE_LABELS[socket.state] ?? socket.state) + '）。下一步：运行 slack_health 看具体原因；网络类问题会自动退避重连，invalid_auth 需要更换 App-Level Token。'

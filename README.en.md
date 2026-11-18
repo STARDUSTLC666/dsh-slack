@@ -2,13 +2,13 @@
 
 # Slack
 
-**Bring task notifications and thread replies to Slack.**
+**Bring task notifications and thread replies straight into Slack.**
 
-Slack integration plugin for DeepSeek Harness (`>=0.2.2-rc.3`): supports channel notifications, thread replies, optional Socket Mode inbox reception, health diagnostics, and Cordis hot-reload cleanup.
+Slack integration plugin for DeepSeek Harness (`>=0.2.2-rc.3`): supports native live Settings forms with secret masking, channel notifications, thread replies, optional Socket Mode inbox reception, health diagnostics, and controlled backoff reconnects.
 
 [![npm](https://img.shields.io/npm/v/dsh-slack)](https://www.npmjs.com/package/dsh-slack) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-downloads.svg)](https://www.npmjs.com/package/dsh-slack) [![total downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-total-downloads.svg)](https://www.npmjs.com/package/dsh-slack)
 
-**[Install](#install) · [Workflow](#start-using-it) · [Full guide](https://github.com/STARDUSTLC666/dsh-slack/blob/main/docs/REFERENCE.en.md)**
+**[Install](#install) · [Get Started in 3 Steps](#get-started-in-3-steps) · [Full Guide](https://github.com/STARDUSTLC666/dsh-slack/blob/main/docs/USAGE.en.md)**
 
 <picture>
   <source media="(prefers-color-scheme: dark) and (max-width: 640px)" srcset="https://raw.githubusercontent.com/STARDUSTLC666/dsh-slack/main/docs/assets/intro/workflow-en-mobile-dark.svg">
@@ -17,52 +17,55 @@ Slack integration plugin for DeepSeek Harness (`>=0.2.2-rc.3`): supports channel
   <img src="https://raw.githubusercontent.com/STARDUSTLC666/dsh-slack/main/docs/assets/intro/workflow-en-light.svg" alt="Bring task notifications and thread replies to Slack. · workflow illustration" width="100%">
 </picture>
 
-## Features
-
-- Send channel notifications or thread replies.
-- Use visible channels and the Socket Mode inbox.
-- Inspect connection state and handle authentication or reconnect issues.
-
 ## Install
 
-Open **Plugins** in the DSH desktop app and install `dsh-slack`. If the CLI is available:
+Open **Plugins** in the DSH desktop app and install `dsh-slack`, or use the CLI:
 
 ```bash
 dsh plugin --profile desktop add dsh-slack
 ```
 
-For the web profile, replace `desktop` with `web`. Restart that DSH profile after installation. The package’s DSH requirement is `>=0.2.2-rc.3`.
+For the web profile, replace `desktop` with `web`. Restart DSH once after installing. Requires DSH `>=0.2.2-rc.3`.
 
-## Start using it
+<a id="start-using-it"></a>
+## Get Started in 3 Steps
 
-1. Configure permissions and Socket Mode for your Slack App, and obtain Bot and App-level tokens.
-2. Enter the tokens in DSH Slack settings and check the connection state.
-3. Verify incoming messages in your own test channel before asking for summaries or thread replies.
-4. Verify the channel, thread and text before sending. Check Slack for the result and inspect connection state before retrying.
+1. **Create a Slack App & grab your token**: At <https://api.slack.com/apps>, grant `chat:write` and `channels:read`, install the App to your workspace, and copy the `xoxb-` Bot Token (for two-way inbox messages, also enable Socket Mode and generate an `xapp-` App-Level Token).
+2. **Fill in DSH Settings (`token` applies live)**: Open **DSH Settings → Plugins → Slack (`dsh-slack`)** and enter `token` and `defaultChannel` (tokens are masked; `DSH_SLACK_TOKEN` and `DSH_SLACK_APP_TOKEN` env vars are also supported).
+3. **Invite the bot & verify**: Run `/invite @your-bot` inside your target Slack channel, then ask the assistant to check Slack health and visible channels.
 
-Example request：
+## Copy-Ready Prompts for Everyday Work
 
-> Check Slack and prepare a project update. Confirm the channel and content before sending.
+- **Check Slack health and list accessible channels**
+  > Check my Slack connection status and list the channels (with channel IDs) the bot can currently access.
+- **Draft and review a channel update before posting**
+  > Summarize our progress for `#engineering` and show me the draft first. Post to Slack only after I confirm.
+- **Triage Socket Mode inbox & draft thread replies**
+  > Read the latest unread messages in the Slack inbox, summarize what needs action, and draft a thread reply for my review without sending yet.
 
-## Before you start
+## Quick Troubleshooting Checklist
 
-Requires your own Slack App, permissions and tokens. Access is limited to messages visible to the bot.
-
-Configuration, detailed tools and troubleshooting: [full reference](https://github.com/STARDUSTLC666/dsh-slack/blob/main/docs/REFERENCE.en.md).
+| Symptom | Likely Cause | Fix |
+| :--- | :--- | :--- |
+| `token 未配置` | Missing `xoxb-` / `xoxp-` token | Paste `token` in **DSH Settings → Plugins → Slack** (applies live) or set `DSH_SLACK_TOKEN` |
+| `not_in_channel` or `channel_not_found` | Bot has not joined the channel, or private channel needs its ID | Run `/invite @your-bot` in Slack, then ask the assistant to list visible channels |
+| `slack_inbox` stays empty | Missing `xapp-` token, Socket Mode off, or missing event subscriptions | Enable Socket Mode + subscribe to `message.channels` / `message.im`, set `appToken`, and reload |
+| `invalid_auth` / `missing_scope` | Token revoked or missing `chat:write` / `channels:read` | Add scopes, reinstall the App to your workspace, and update `token` |
 
 ## Plugin updates
 
-Check updates at the bottom of the workbench or native plugin details. Automatic checks are on by default; **automatic installation is off**. You choose whether to install and when to restart. Suite-managed components update with their bundle. [Update behavior](https://github.com/STARDUSTLC666/dsh-slack/blob/main/docs/REFERENCE.en.md).
+Check updates at the bottom of native plugin details. Automatic checks are on by default; **automatic installation is off**. Suite-managed components update with their bundle.
 
 ## Documentation
 
-- [Full usage, configuration and limits](https://github.com/STARDUSTLC666/dsh-slack/blob/main/docs/REFERENCE.en.md)
+- [Usage guide and configuration reference](https://github.com/STARDUSTLC666/dsh-slack/blob/main/docs/USAGE.en.md)
+- [Full reference](https://github.com/STARDUSTLC666/dsh-slack/blob/main/docs/REFERENCE.en.md)
 - [Release notes](https://github.com/STARDUSTLC666/dsh-slack/blob/main/CHANGELOG.md)
 - [Validation scope and history](https://github.com/STARDUSTLC666/dsh-slack/blob/main/docs/VALIDATION.md)
 
 ## Feedback and contributions
 
-If the plugin helps, a Star makes it easier for others to discover. Report problems or suggest improvements in [Issues](https://github.com/STARDUSTLC666/dsh-slack/issues); code and documentation [PRs](https://github.com/STARDUSTLC666/dsh-slack/pulls) are welcome. Include versions and reproduction steps, and remove credentials from reports.
+If the plugin helps, a Star makes it easier for others to discover. Report issues in [Issues](https://github.com/STARDUSTLC666/dsh-slack/issues) or open [PRs](https://github.com/STARDUSTLC666/dsh-slack/pulls) (please strip credentials).
 
 ## License
 

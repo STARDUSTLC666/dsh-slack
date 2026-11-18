@@ -1,5 +1,10 @@
 # 更新记录
 
+## 0.5.0 (2026-11-18)
+
+- 新增零外部依赖的宿主原生 `Config` 设置表单声明（`token` 与 `appToken` 自动脱敏，令牌与默认频道修改即热生效），优化未配置引导，并重写符合人类直觉的三步上手与日常对话示例。
+- Export a zero-dependency native DSH `Config` schema with secret masking and live reload for `token`, `defaultChannel`, and `slackApiUrl`, plus clearer first-run guidance and copy-ready human workflow docs.
+
 ## 0.4.14 (2026-11-18)
 
 - 更新区底部新增克制、无打扰的 GitHub 点赞与问题反馈快捷链接，并完善中英文检索关键词。
