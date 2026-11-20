@@ -57,13 +57,15 @@ export function createWebSlackClient(token: string, slackApiUrl?: string): Slack
       let pages = 0
       const allChannels: ChannelInfo[] = []
       const seen = new Set<string>()
+      const cursors = new Set<string>()
       // Follow the official pagination cursor, with the existing 20-page cap.
       do {
         pages += 1
-        if (pages > 20) break
+        if (pages > 20) throw new Error('Slack 频道列表超过分页上限，无法确认完整清单；请缩小机器人可见范围后重试。')
         signal?.throwIfAborted()
         const result = await requestClient.conversations.list({
           types: 'public_channel,private_channel',
+          limit: 200,
           ...(cursor !== undefined ? { cursor } : {}),
         })
         signal?.throwIfAborted()
@@ -74,7 +76,11 @@ export function createWebSlackClient(token: string, slackApiUrl?: string): Slack
           }
         }
         const next = result.response_metadata?.next_cursor
-        cursor = typeof next === 'string' && next !== cursor ? next : ''
+        cursor = typeof next === 'string' ? next.trim() : ''
+        if (cursor) {
+          if (cursors.has(cursor)) throw new Error('Slack 返回重复分页游标，频道清单不完整；请稍后重试。')
+          cursors.add(cursor)
+        }
       } while (cursor !== '')
       return allChannels
     },

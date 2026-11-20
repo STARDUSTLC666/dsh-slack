@@ -21,6 +21,30 @@ test('真实 WebClient 不自动重试限流或服务端失败，缺失回执不
   await assert.rejects(client.postMessage({ channel: 'C1', text: 'local fixture only' }), /无法确认提交结果/)
 })
 
+test('channel pagination requests full pages and cannot silently return a truncated inventory', async t => {
+  const requests = []
+  let mode = 'complete'
+  const server = createServer((request, response) => {
+    let body = ''; request.on('data', chunk => {body += chunk}); request.on('end', () => {
+      const params = new URLSearchParams(body); requests.push(Object.fromEntries(params))
+      const cursor = params.get('cursor') ?? ''
+      const next = mode === 'complete' ? cursor ? '' : 'next' : mode === 'repeat' ? 'cycle' : 'page-' + requests.length
+      response.writeHead(200, {'content-type':'application/json'}).end(JSON.stringify({ok:true, channels:[{id:cursor || 'first',name:'channel'}], response_metadata:{next_cursor:next}}))
+    })
+  })
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve))
+  t.after(()=>{server.closeAllConnections();return new Promise(resolve=>server.close(resolve))})
+  const client = createWebSlackClient('synthetic', `http://127.0.0.1:${server.address().port}/`)
+  assert.equal((await client.listChannels()).length,2)
+  assert.equal(requests[0].limit,'200')
+  mode = 'repeat'; requests.length = 0
+  await assert.rejects(client.listChannels(), /分页|完整/)
+  assert.equal(requests.length,2)
+  mode = 'limit'; requests.length = 0
+  await assert.rejects(client.listChannels(), /分页|完整/)
+  assert.equal(requests.length,20)
+})
+
 test('buildNotifyTool 用注入 client 调 postMessage，参数正确', async () => {
   let captured = null
   const fake = {
