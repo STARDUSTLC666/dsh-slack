@@ -1,5 +1,12 @@
 # 更新记录
 
+## 0.5.6 (2026-11-20)
+
+- 通知、线程回复与频道查询遵守宿主取消信号：已取消调用不再发送请求，进行中的 HTTP 请求及时终止，并保留原始取消原因。
+- 每次调用独立组合宿主与 SDK 超时信号，避免取消一个请求干扰其他并发请求；既有客户端方法保持兼容。
+- Honor caller cancellation before dispatch and during HTTP requests, preserving cancellation reasons and isolating concurrent Slack calls.
+- 同步共享更新组件 0.2.9，修复取消窗口和失败响应清理，并确保运行中旧协调器在空闲后接管修复。
+
 ## 0.5.5 (2026-11-20)
 
 - 升级共享更新组件至 `@stardustlc/dsh-updates@0.2.7`：对话页「有新版本」提醒浮卡支持无交互 15 秒自动收起（悬停、聚焦、查看记录或确认弹窗时自动暂停，安装成功提示 6 秒收起，安装中/失败/需要重启仍保持常驻不隐藏）。

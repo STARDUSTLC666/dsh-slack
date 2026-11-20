@@ -16,11 +16,11 @@ export interface ChannelInfo {
 /** 可注入的 Slack 客户端抽象。 */
 export interface SlackClient {
     /** 发消息，返回消息 ts（用于线程后续引用）。 */
-    postMessage(params: PostMessageParams): Promise<{
+    postMessage(params: PostMessageParams, signal?: AbortSignal): Promise<{
         ts: string;
     }>;
     /** 列出机器人可见频道。 */
-    listChannels(): Promise<ChannelInfo[]>;
+    listChannels(signal?: AbortSignal): Promise<ChannelInfo[]>;
 }
 /** 用官方 WebClient 实现。 */
 export declare function createWebSlackClient(token: string, slackApiUrl?: string): SlackClient;

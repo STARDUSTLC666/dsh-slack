@@ -7,6 +7,11 @@ import { assertChannel, assertText, assertThreadTs, mapSlackError } from './slac
 import type { InboxMessage, InboxQueue } from './inbox.js'
 import type { SocketStatus } from './socket.js'
 
+function executionSignal(exec: unknown): AbortSignal | undefined {
+  const signal = (exec as { signal?: unknown } | null)?.signal
+  return signal instanceof AbortSignal ? signal : undefined
+}
+
 /** 工具构建的依赖注入点。 */
 export interface ToolDeps {
   clientProvider: () => SlackClient
@@ -157,7 +162,9 @@ export function buildNotifyTool(deps: ToolDeps): ToolDefinition {
     parameters,
     output,
     timeoutMs: 30000,
-    async execute(args) {
+    async execute(args, exec) {
+      const signal = executionSignal(exec)
+      signal?.throwIfAborted()
       const raw = args as { channel?: unknown; text?: unknown; thread_ts?: unknown }
       const channel = assertChannel(raw.channel)
       const text = assertText(raw.text)
@@ -170,9 +177,11 @@ export function buildNotifyTool(deps: ToolDeps): ToolDefinition {
           channel,
           text,
           ...(thread_ts !== undefined ? { thread_ts } : {}),
-        })
+        }, signal)
+        signal?.throwIfAborted()
         return { ts: result.ts, channel }
       } catch (error) {
+        signal?.throwIfAborted()
         throw new Error(mapSlackError(error))
       }
     },
@@ -202,12 +211,16 @@ export function buildChannelsTool(deps: ToolDeps): ToolDefinition {
     parameters,
     output,
     timeoutMs: 30000,
-    async execute() {
+    async execute(_args, exec) {
+      const signal = executionSignal(exec)
+      signal?.throwIfAborted()
       const client = deps.clientProvider()
       try {
-        const channels = await client.listChannels()
+        const channels = await client.listChannels(signal)
+        signal?.throwIfAborted()
         return { channels: channels.map((c) => ({ id: c.id, name: c.name })) }
       } catch (error) {
+        signal?.throwIfAborted()
         throw new Error(mapSlackError(error))
       }
     },
@@ -280,16 +293,20 @@ export function buildReplyTool(deps: ToolDeps): ToolDefinition {
     parameters,
     output,
     timeoutMs: 30000,
-    async execute(args) {
+    async execute(args, exec) {
+      const signal = executionSignal(exec)
+      signal?.throwIfAborted()
       const raw = args as { channel?: unknown; text?: unknown; thread_ts?: unknown }
       const channel = assertChannel(raw.channel)
       const text = assertText(raw.text)
       const thread_ts = assertThreadTs(raw.thread_ts)
       const client = deps.clientProvider()
       try {
-        const result = await client.postMessage({ channel, text, thread_ts })
+        const result = await client.postMessage({ channel, text, thread_ts }, signal)
+        signal?.throwIfAborted()
         return { ts: result.ts, channel }
       } catch (error) {
+        signal?.throwIfAborted()
         throw new Error(mapSlackError(error))
       }
     },

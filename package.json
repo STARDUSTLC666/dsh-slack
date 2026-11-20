@@ -1,6 +1,6 @@
 {
   "name": "dsh-slack",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "description": "DeepSeek Harness Slack 集成插件：频道通知、线程回复、Socket Mode 收件箱与受控重连。欢迎提交 issues 和 PR。",
   "type": "module",
   "main": "./lib/index.js",
@@ -46,7 +46,7 @@
     "@slack/socket-mode": "^3.1.0",
     "@slack/web-api": "^8.0.0",
     "undici": "^7.0.0 || ^8.0.0",
-    "@stardustlc/dsh-updates": "0.2.7"
+    "@stardustlc/dsh-updates": "0.2.9"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

@@ -21,28 +21,38 @@ export interface ChannelInfo {
 /** 可注入的 Slack 客户端抽象。 */
 export interface SlackClient {
   /** 发消息，返回消息 ts（用于线程后续引用）。 */
-  postMessage(params: PostMessageParams): Promise<{ ts: string }>
+  postMessage(params: PostMessageParams, signal?: AbortSignal): Promise<{ ts: string }>
   /** 列出机器人可见频道。 */
-  listChannels(): Promise<ChannelInfo[]>
+  listChannels(signal?: AbortSignal): Promise<ChannelInfo[]>
 }
 
 /** 用官方 WebClient 实现。 */
 export function createWebSlackClient(token: string, slackApiUrl?: string): SlackClient {
-  const client = new WebClient(token, {
+  const createClient = (signal?: AbortSignal) => new WebClient(token, {
     timeout: 25000, retryConfig: { retries: 0 }, rejectRateLimitedCalls: true,
+    // Capture the signal per client so concurrent SDK requests cannot share cancellation.
+    ...(signal ? { fetch: (url: string | URL, init?: Parameters<typeof fetch>[1]) => {
+      signal.throwIfAborted()
+      return fetch(url, { ...init, signal: init?.signal ? AbortSignal.any([signal, init.signal]) : signal })
+    } } : {}),
     ...(slackApiUrl !== undefined && slackApiUrl !== '' ? { slackApiUrl } : {}) })
+  const client = createClient()
   return {
-    async postMessage(params: PostMessageParams): Promise<{ ts: string }> {
-      const result = await client.chat.postMessage({
+    async postMessage(params: PostMessageParams, signal?: AbortSignal): Promise<{ ts: string }> {
+      signal?.throwIfAborted()
+      const result = await (signal ? createClient(signal) : client).chat.postMessage({
         channel: params.channel,
         text: params.text,
         ...(params.thread_ts !== undefined ? { thread_ts: params.thread_ts } : {}),
       })
+      signal?.throwIfAborted()
       const ts = typeof result.ts === 'string' ? result.ts : ''
       if (!ts) throw new Error('Slack 未返回消息回执，无法确认提交结果；请先检查频道，避免直接重发。')
       return { ts }
     },
-    async listChannels(): Promise<ChannelInfo[]> {
+    async listChannels(signal?: AbortSignal): Promise<ChannelInfo[]> {
+      signal?.throwIfAborted()
+      const requestClient = signal ? createClient(signal) : client
       let cursor: string | undefined
       let pages = 0
       const allChannels: ChannelInfo[] = []
@@ -51,10 +61,12 @@ export function createWebSlackClient(token: string, slackApiUrl?: string): Slack
       do {
         pages += 1
         if (pages > 20) break
-        const result = await client.conversations.list({
+        signal?.throwIfAborted()
+        const result = await requestClient.conversations.list({
           types: 'public_channel,private_channel',
           ...(cursor !== undefined ? { cursor } : {}),
         })
+        signal?.throwIfAborted()
         for (const ch of (result.channels ?? [])) {
           if (typeof ch.id === 'string' && typeof ch.name === 'string' && !seen.has(ch.id)) {
             seen.add(ch.id)
