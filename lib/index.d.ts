@@ -12,7 +12,7 @@ export { liveConfig, createVolatile, HostValidationError, type HostSchemaNode, t
 export { compileParameters, type ParameterDsl, type ParameterDslMap, type JsonSchemaNode } from './compile.js';
 export { parseConfig, resolveToken, resolveDefaultChannel, requireToken, resolveAppToken, ENV_TOKEN, ENV_APP_TOKEN, type SlackConfig, } from './config.js';
 export { createWebSlackClient, mapSlackError, assertChannel, assertText, assertThreadTs, type SlackClient, type PostMessageParams, type ChannelInfo, } from './slack-client.js';
-export { buildNotifyTool, buildChannelsTool, buildInboxTool, buildReplyTool, type ToolDeps } from './tools.js';
+export { buildNotifyTool, buildChannelsTool, buildInboxTool, buildReplyTool, buildHealthTool, type ToolDeps } from './tools.js';
 export { parseMessageEvent, InboxQueue, createInboxQueue, INBOX_CAPACITY, type InboxMessage } from './inbox.js';
 export { startSocketModeClient, type SocketMessageHandler, type SocketStatus, type SocketDisposer, type SocketLifecycleOptions } from './socket.js';
 export type { SlackContext, ToolDefinition, ToolOutputDefinition, ContentBlock } from './types.js';

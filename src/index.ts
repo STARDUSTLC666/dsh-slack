@@ -39,7 +39,7 @@ export {
   type PostMessageParams,
   type ChannelInfo,
 } from './slack-client.js'
-export { buildNotifyTool, buildChannelsTool, buildInboxTool, buildReplyTool, type ToolDeps } from './tools.js'
+export { buildNotifyTool, buildChannelsTool, buildInboxTool, buildReplyTool, buildHealthTool, type ToolDeps } from './tools.js'
 export { parseMessageEvent, InboxQueue, createInboxQueue, INBOX_CAPACITY, type InboxMessage } from './inbox.js'
 export { startSocketModeClient, type SocketMessageHandler, type SocketStatus, type SocketDisposer, type SocketLifecycleOptions } from './socket.js'
 export type { SlackContext, ToolDefinition, ToolOutputDefinition, ContentBlock } from './types.js'
@@ -82,7 +82,7 @@ export function apply(ctx: SlackContext, rawConfig: unknown): void {
   }
 
   if (config === undefined) {
-    warn('[dsh-slack] 配置缺失或格式错误：slack_notify / slack_channels / slack_inbox / slack_reply 已注册，但调用时会报错。可在 DSH「设置 → 插件 → Slack」或 profile 的 cordis.patch.yml 填写配置。')
+    warn('[dsh-slack] 配置缺失或格式错误：slack_notify / slack_channels / slack_inbox / slack_reply / slack_health 已注册，但调用时会报错。可在 DSH「设置 → 插件 → Slack」或 profile 的 cordis.patch.yml 填写配置。')
   } else {
     if (!resolveToken(config)) {
       warn('[dsh-slack] 未检测到 Slack 令牌（config.token 与 DSH_SLACK_TOKEN 均为空）：可在 DSH「设置 → 插件 → Slack」填写 token（保存即生效）。')

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { apply } from '../lib/index.js'
+import { apply, buildHealthTool } from '../lib/index.js'
 
 function mockContext() {
   const registered = []
@@ -33,7 +33,8 @@ test('两个工具的 parameters 都是已编译的 object JSON Schema', () => {
     assert.ok(Array.isArray(tool.parameters.required) || tool.parameters.required === undefined)
   }
   const notify = ctx.registered.find((t) => t.name === 'slack_notify')
-  assert.deepEqual(notify.parameters.required, ['channel', 'text'])
+  assert.deepEqual(notify.parameters.required, ['text'])
+  assert.equal(typeof buildHealthTool, 'function')
 })
 
 test('配置缺失时 execute 抛中文 token 错误', async () => {

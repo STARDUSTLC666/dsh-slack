@@ -1,5 +1,11 @@
 # 更新记录
 
+## 0.5.8 (2026-11-23)
+
+- 修复 `slack_notify` 省略或留空 `channel` 时未回退实时 `defaultChannel` 的问题，确保在原生设置面板热更新默认频道后立即生效。
+- 修复 `slack_health` 在 `appToken` 非 `xapp-` 开头时误报“已配置”的问题，补充 `buildHealthTool` 重导出、启动告警漏项、`invalid_auth` 原生设置热更新提示，以及 `docs/REFERENCE` 语言链接与更新策略文案。
+- Allow omitted or empty `channel` in `slack_notify` to fall back to live `.volatile()` `defaultChannel`, clarify invalid `xapp-` prefix diagnostics in `slack_health`, re-export `buildHealthTool`, and align `invalid_auth` and reference docs.
+
 ## 0.5.7 (2026-11-20)
 
 - 升级共享更新组件至 0.2.10，移除跨插件右下角浮动提醒，保留工作台及插件详情页更新控制。

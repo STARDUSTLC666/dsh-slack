@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { createServer } from 'node:http'
 import { apply, Config, liveConfig, parseConfig, resolveToken, resolveAppToken, resolveDefaultChannel, requireToken } from '../lib/index.js'
 
 test('parseConfig 处理缺失/空配置（不抛错）', () => {
@@ -78,4 +79,43 @@ test('Config Schema 兼容宿主设置面板：凭据脱敏、volatile 热更新
   const checkAfter = await health.execute({})
   assert.equal(checkAfter.ok, true)
   assert.equal(checkAfter.checks[2].detail, '#ops')
+})
+
+test('slack_notify 通过 volatile 热更新 defaultChannel 后立即按新默认频道发送', async (t) => {
+  const receivedChannels = []
+  const server = createServer((req, res) => {
+    let body = ''
+    req.on('data', (chunk) => { body += chunk })
+    req.on('end', () => {
+      receivedChannels.push(new URLSearchParams(body).get('channel'))
+      res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: true, ts: '1700.1' }))
+    })
+  })
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => {
+    server.closeAllConnections()
+    return new Promise((resolve) => server.close(resolve))
+  })
+  const apiUrl = `http://127.0.0.1:${server.address().port}/`
+
+  const parsed = Config({ token: 'xoxb-live', defaultChannel: '#initial', slackApiUrl: apiUrl })
+  const registered = []
+  apply({ tools: { register: (def) => { registered.push(def); return () => {} } }, logger: { warn() {} } }, parsed)
+  const notify = registered.find((d) => d.name === 'slack_notify')
+
+  const first = await notify.execute({ text: 'hello 1' })
+  assert.equal(first.channel, '#initial')
+
+  const writeSym = Symbol.for('cosmokit.volatile.write')
+  parsed.defaultChannel[writeSym]('#hot-updated')
+  const second = await notify.execute({ text: 'hello 2' })
+  assert.equal(second.channel, '#hot-updated')
+
+  const third = await notify.execute({ channel: '', text: 'hello 3' })
+  assert.equal(third.channel, '#hot-updated')
+
+  parsed.defaultChannel[writeSym]('')
+  await assert.rejects(() => notify.execute({ text: 'hello 4' }), /defaultChannel/)
+
+  assert.deepEqual(receivedChannels, ['#initial', '#hot-updated', '#hot-updated'])
 })

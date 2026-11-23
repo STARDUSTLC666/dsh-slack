@@ -31,3 +31,18 @@ test('slack_health 缺 token 时 ok=false 且说明影响', async () => {
   assert.match(String(value.checks[0].detail), /未配置/)
   assert.match(String(value.checks[1].detail), /收件箱功能不可用/)
 })
+
+test('slack_health 在 appToken 非 xapp- 开头时明确报错前缀无效，不误报已配置', async () => {
+  const health = buildHealthTool(deps({ token: 'xoxb-1', appToken: 'xoxp-wrong', defaultChannel: '#general' }))
+  const value = await health.execute({})
+  assert.equal(value.ok, false)
+  const appCheck = value.checks.find((c) => c.name === 'appToken')
+  assert.equal(appCheck.ok, false)
+  assert.match(String(appCheck.detail), /xapp-/)
+  assert.doesNotMatch(String(appCheck.detail), /已配置/)
+  const socketCheck = value.checks.find((c) => c.name === 'Socket Mode')
+  assert.equal(socketCheck.ok, false)
+  assert.match(String(socketCheck.detail), /xapp-/)
+  const rendered = health.output.render({}, value)[0].text
+  assert.match(rendered, /appToken.*xapp-/)
+})

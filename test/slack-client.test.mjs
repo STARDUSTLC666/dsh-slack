@@ -68,8 +68,39 @@ test('不传 thread_ts 时 postMessage 不含该字段', async () => {
 })
 
 test('mapSlackError 映射 invalid_auth / channel_not_found 为中文', () => {
-  assert.match(mapSlackError({ data: { error: 'invalid_auth' } }), /token/)
+  const invalidAuth = mapSlackError({ data: { error: 'invalid_auth' } })
+  assert.match(invalidAuth, /token/)
+  assert.match(invalidAuth, /设置 → 插件 → Slack/)
   assert.match(mapSlackError({ data: { error: 'channel_not_found' } }), /频道/)
+})
+
+test('slack_notify 省略或留空 channel 时按执行期最新 defaultChannel 回退，均为空时报错', async () => {
+  const sent = []
+  let currentChannel = ''
+  const fake = {
+    async postMessage(params) { sent.push(params); return { ts: '1.0' } },
+    async listChannels() { return [] },
+  }
+  const tool = buildNotifyTool({
+    clientProvider: () => fake,
+    configProvider: () => ({ token: 'xoxb-test', defaultChannel: currentChannel, appToken: '' }),
+  })
+  // 初始未配置 defaultChannel 且未传 channel：抛出清晰错误
+  await assert.rejects(() => tool.execute({ text: 'no-ch' }), /defaultChannel/)
+  await assert.rejects(() => tool.execute({ channel: '   ', text: 'blank-ch' }), /defaultChannel/)
+
+  // 运行期更新 defaultChannel 后，省略或留空 channel 立即生效
+  currentChannel = '#ops-live'
+  assert.deepEqual(await tool.execute({ text: 'omitted' }), { ts: '1.0', channel: '#ops-live' })
+  assert.deepEqual(await tool.execute({ channel: '', text: 'empty' }), { ts: '1.0', channel: '#ops-live' })
+
+  // 再次热更新 defaultChannel
+  currentChannel = 'C999'
+  assert.deepEqual(await tool.execute({ text: 'hot-reloaded' }), { ts: '1.0', channel: 'C999' })
+
+  // 显式传 channel 时优先使用显式参数
+  assert.deepEqual(await tool.execute({ channel: '#explicit', text: 'override' }), { ts: '1.0', channel: '#explicit' })
+  assert.deepEqual(sent.map((s) => s.channel), ['#ops-live', '#ops-live', 'C999', '#explicit'])
 })
 
 test('client 抛 invalid_auth 时 execute 抛中文 token 提示', async () => {

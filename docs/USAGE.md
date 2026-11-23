@@ -92,7 +92,7 @@ $env:DSH_SLACK_APP_TOKEN = "xapp-你的App级令牌"
 
 | 工具 | 作用 | 关键参数与说明 |
 | :--- | :--- | :--- |
-| `slack_notify` | 向频道或线程发送 Markdown 消息 | `channel`、`text` 必填，`thread_ts` 可选；返回 `ts` 供线程跟进 |
+| `slack_notify` | 向频道或线程发送 Markdown 消息 | `text` 必填，`channel` 可选（省略或留空时回退当前 `defaultChannel`），`thread_ts` 可选；返回 `ts` 供线程跟进 |
 | `slack_channels` | 列出机器人可见频道 | 自动翻页拉全，同时展示 `#频道名（频道ID）` |
 | `slack_inbox` | 读取 Socket Mode 内存收件箱 | `limit`（1–50，默认 10）、`markRead`（原子消费已返回消息并返回 `remaining`）；最多缓存 200 条 |
 | `slack_reply` | 在原消息线程下回复 | `channel`、`text`、`thread_ts` 必填 |

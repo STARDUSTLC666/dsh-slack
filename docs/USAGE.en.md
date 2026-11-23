@@ -92,7 +92,7 @@ Run `slack_health` first (distinguishes configured credentials from an active So
 
 | Tool | Purpose | Key Details |
 | :--- | :--- | :--- |
-| `slack_notify` | Send Markdown message to channel or thread | `channel` & `text` required, optional `thread_ts`; returns `ts` |
+| `slack_notify` | Send Markdown message to channel or thread | `text` required; `channel` optional (falls back to live `defaultChannel` when omitted/empty); optional `thread_ts`; returns `ts` |
 | `slack_channels` | List channels visible to the bot | Auto-paginates and prints `#name (ID)` |
 | `slack_inbox` | Read Socket Mode in-memory inbox | `limit` (1–50, default 10), `markRead` (atomic drain returning `remaining`), up to 200 items |
 | `slack_reply` | Reply inside an existing message thread | `channel`, `text`, and `thread_ts` required |
