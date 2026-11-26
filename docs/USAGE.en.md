@@ -6,28 +6,30 @@
 
 ### Step 1: Create Your Slack App & Copy Tokens
 
-**Core outbound & channel scopes (2-minute setup):**
+**Option 1 (Recommended — 30-second one-click Manifest import):**
+1. Visit <https://api.slack.com/apps> → **Create New App** → **From a manifest**, and select your workspace.
+2. Switch to the **YAML** tab, paste [`slack-app-manifest.yaml`](../slack-app-manifest.yaml) → **Next** → **Create**.
+   - The manifest preconfigures the exact minimal bot scopes (including the easily missed `app_mentions:read`), Socket Mode, all 5 inbox bot events, and `app_home.messages_tab_read_only_enabled: false` so users can immediately DM the bot in Slack.
+3. Click **Install App → Install to Workspace** and copy your **`xoxb-`** (or rotating `xoxe.xoxb-`) **Bot User OAuth Token**.
+4. Optional (for Socket Mode `slack_inbox`): open **Basic Information → App-Level Tokens → Generate Token and Scopes**, add `connections:write`, and copy your **`xapp-` App-Level Token**.
+
+**Option 2 (Manual scope setup):**
 1. Visit <https://api.slack.com/apps> → **Create New App** → **From scratch**, and choose your workspace.
 2. Under **OAuth & Permissions → Bot Token Scopes**, add the scopes you need:
    - **Core (required)**:
      - `chat:write` (send channel messages & thread replies)
      - `channels:read` (list public channels & resolve `#channel` names)
-   - **Optional (for extended tools & private channels)**:
+   - **Optional (for extended tools, private channels & inbox events)**:
      - `groups:read` (list private channels; if omitted, `slack_channels` automatically falls back to public channels)
-     - `channels:history` / `groups:history` / `im:history` / `mpim:history` (read channel history via `slack_history` and threads via `slack_thread`)
+     - `channels:history` / `groups:history` / `im:history` / `mpim:history` (read channel/thread history via `slack_history` & `slack_thread`, and receive `message.*` events)
+     - `im:read` / `mpim:read` (DM and group-DM conversation metadata)
+     - `app_mentions:read` (required when subscribing to `app_mention` events)
      - `files:write` (upload text or local files via `slack_upload`)
      - `reactions:write` (add emoji reactions via `slack_react`)
      - `users:read` (optional display-name resolution for history/thread senders; silently falls back to user IDs if absent)
-3. Click **Install to Workspace** and copy your **`xoxb-`** (or rotating `xoxe.xoxb-`) **Bot User OAuth Token**.
-
-**Optional — for two-way incoming messages (`slack_inbox` via Socket Mode):**
-1. Open **Socket Mode** → turn on **Enable Socket Mode**, and generate an **`xapp-` App-Level Token** with `connections:write`.
-2. Open **Event Subscriptions** → enable events, and subscribe under **Subscribe to bot events** to:
-   - `message.channels` (public channel messages)
-   - `message.groups` (private channel messages)
-   - `message.im` (direct messages)
-   - `message.mpim` (group DMs)
-   - `app_mention` (`@bot` mentions; deduplicated by `(channel, ts)` when combined with `message.*`)
+3. To allow users to DM the bot, enable **App Home → Messages Tab** and check **Allow users to send Slash commands and messages from the messages tab** (`messages_tab_read_only_enabled: false`).
+4. Click **Install to Workspace** and copy your **`xoxb-`** **Bot User OAuth Token**.
+5. For two-way `slack_inbox`, enable **Socket Mode** (generate an `xapp-` token with `connections:write`) and subscribe under **Event Subscriptions → Subscribe to bot events** to `message.channels`, `message.groups`, `message.im`, `message.mpim`, and `app_mention` (deduplicated by `(channel, ts)`).
 
 ### Step 2: Configure in DSH (Choose Either Option)
 
@@ -113,10 +115,10 @@ Run `slack_health` first (offline by default; pass `verify=true` to verify the l
 | `slack_channels` | List channels visible to the bot | Optional `scope`: `joined` (default, `users.conversations`) or `all` (`conversations.list`); excludes archived channels, displays public/private badges, and falls back to public channels if `groups:read` is absent. Scopes: `channels:read` (optional `groups:read`) |
 | `slack_inbox` | Read Socket Mode in-memory inbox | `limit` (1–50, default 10), `markRead` (atomic drain returning `remaining`); preserves `thread_ts`, `event_type` (`app_mention`), and `files`, supports `thread_broadcast` / `file_share`, deduplicates by `(channel, ts)`, and filters bot self-messages |
 | `slack_health` | Offline & online health diagnostics | Optional `verify` (`false` by default; `true` calls `auth.test` to verify token, workspace, identity & scopes); validates `token`/`appToken` prefixes and `slackApiUrl` |
-| `slack_history` | Read channel message history | `channel` required (`#name` auto-resolved), `limit` (1–100, default 20), optional `oldest` / `latest`. Scopes: `channels:history` / `groups:history` (optional `users:read`) |
+| `slack_history` | Read channel message history | `channel` required (`#name`, `channel:ID`, and `<#ID|name>` auto-resolved), `limit` (1–100, default 20), optional `oldest` / `latest` (Slack `ts` or ISO-8601 such as `2026-11-26T00:00:00Z`); extracts readable fallback text from Block Kit & attachment-only alerts. Scopes: `channels:history` / `groups:history` (optional `users:read`) |
 | `slack_thread` | Read full thread conversation | `channel` and `thread_ts` required, `limit` (1–100, default 50); returns parent message and replies. Scopes: same as `slack_history` |
 | `slack_upload` | Upload text or local file to channel/thread | `filename` required; provide either `content` or `file_path`; optional `channel` (falls back to `defaultChannel`), `title`, `initial_comment`, `thread_ts`; uses `filesUploadV2`. Scope: `files:write` |
-| `slack_react` | Add an emoji reaction to a message | `channel`, `timestamp`, and `name` (e.g. `thumbsup` or `:white_check_mark:`) required. Scope: `reactions:write` |
+| `slack_react` | Add an emoji reaction to a message | `channel`, `timestamp`, and `name` (`thumbsup`, `:white_check_mark:`, or common Unicode glyphs like `👍` / `✅` auto-normalized to shortcodes) required. Scope: `reactions:write` |
 
 ---
 

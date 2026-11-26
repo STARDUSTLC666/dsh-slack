@@ -41,7 +41,7 @@ For the web profile, replace `desktop` with `web`. Restart DSH once after instal
 <a id="start-using-it"></a>
 ## Get Started in 3 Steps
 
-1. **Create a Slack App & grab tokens**: At <https://api.slack.com/apps>, grant core scopes `chat:write` and `channels:read` (plus optional `groups:read`, `channels:history`, `files:write`, `reactions:write`, `users:read` as needed), install to your workspace, and copy the `xoxb-` Bot Token (enable Socket Mode + `xapp-` token for two-way inbox support).
+1. **Create a Slack App in one click**: Visit <https://api.slack.com/apps> → **Create New App** → **From a manifest**, paste [`slack-app-manifest.yaml`](https://github.com/STARDUSTLC666/dsh-slack/blob/main/slack-app-manifest.yaml) (preconfigured with all required bot scopes, Socket Mode, writable DM Messages tab, and event subscriptions), install to your workspace, and copy the `xoxb-` Bot Token (for Socket Mode inbox, generate an `xapp-` App-Level Token with `connections:write` under **Basic Information → App-Level Tokens**). Manual scope setup is documented in the [Usage Guide](https://github.com/STARDUSTLC666/dsh-slack/blob/main/docs/USAGE.en.md#step-1-create-your-slack-app--copy-tokens).
 2. **Save in DSH Settings**: Open **DSH Settings → Plugins → Slack (`dsh-slack`)** and enter `token` and `defaultChannel` (tokens are masked and outgoing settings apply live).
 3. **Invite the bot & verify**: Run `/invite @your-bot` inside your target Slack channel, then ask the assistant to run an online health check (`slack_health` with `verify=true`) and list joined channels.
 
@@ -64,7 +64,7 @@ For the web profile, replace `desktop` with `web`. Restart DSH once after instal
 | :--- | :--- | :--- |
 | `token 未配置` or invalid prefix | Missing `xoxb-` / `xoxp-` token, or `xapp-` pasted into `token` | Put `xoxb-` in `token` (applies live) and `xapp-` in `appToken` under **DSH Settings → Plugins → Slack** |
 | `not_in_channel` / `channel_not_found` | Bot has not joined the channel, or private channel needs its ID | Run `/invite @your-bot` in Slack, then run `slack_channels` to copy the exact channel ID |
-| `slack_inbox` stays empty | Missing `xapp-` token, Socket Mode off, or missing event subscriptions | Enable Socket Mode, subscribe to `message.channels` / `message.groups` / `message.im` / `message.mpim` / `app_mention`, set `appToken`, and reload |
+| `slack_inbox` stays empty | Missing `xapp-` token, Socket Mode off, or missing events / `app_mentions:read` | Import `slack-app-manifest.yaml` (recommended), or enable Socket Mode, subscribe to `message.*` / `app_mention` with matching `*:history` / `app_mentions:read` scopes, set `appToken`, and reload |
 | `invalid_auth` / `missing_scope` | Token revoked or missing required scopes (error message names exact missing scope) | Add the listed scopes in Slack App settings, click **Reinstall to Workspace**, update `token`, and verify with `slack_health(verify=true)` |
 
 ## Plugin updates

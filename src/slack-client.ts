@@ -7,6 +7,7 @@
 import { readFile, stat } from 'node:fs/promises'
 import { ErrorCode, WebClient, type FilesUploadV2Arguments } from '@slack/web-api'
 import { isValidSlackApiUrl } from './config.js'
+import { extractFallbackMessageText } from './message-text.js'
 import { createSilentSlackLogger, createTransportFetch } from './transport.js'
 
 const SILENT_LOGGER = createSilentSlackLogger()
@@ -21,9 +22,14 @@ const USER_CACHE_TTL_MS = 10 * 60 * 1000
 const USER_CACHE_MAX_SIZE = 500
 const MAX_USER_LOOKUPS_PER_CALL = 15
 const USER_LOOKUP_CONCURRENCY = 4
-// Real Slack channel/group/DM IDs start with C/G/D, contain at least one digit, and are 8+ chars.
+// Real Slack channel/group/DM/Enterprise shared IDs start with C/G/D/Z, contain at least one digit, and are 8+ chars.
 // Excludes W... (Enterprise user IDs) and all-letter names like GENERAL/WARNINGS/CHANNEL.
-const SLACK_CHANNEL_ID_RE = /^[CGD](?=[A-Z0-9]*\d)[A-Z0-9]{7,}$/
+const SLACK_CHANNEL_ID_RE = /^[CGDZ](?=[A-Z0-9]*\d)[A-Z0-9]{7,}$/
+const SLACK_CHANNEL_MENTION_RE = /^<#([CGDZ](?=[A-Z0-9]*\d)[A-Z0-9]{2,})(?:\|[^>]*)?>$/i
+const SLACK_CHANNEL_PREFIX_RE = /^channel:([CGDZ](?=[A-Z0-9]*\d)[A-Z0-9]{2,})$/i
+const SLACK_NUMERIC_TS_RE = /^\d+(?:\.\d+)?$/
+const ISO_DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/
+const ISO_DATETIME_TZ_RE = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|([+-])(\d{2}):?(\d{2}))$/i
 
 const kLocalSlackError = Symbol.for('dsh-slack.local-error')
 
@@ -231,7 +237,11 @@ interface RawSlackMessage {
   ts?: unknown
   user?: unknown
   bot_id?: unknown
+  username?: unknown
+  bot_profile?: { name?: unknown }
   text?: unknown
+  blocks?: unknown
+  attachments?: unknown
   thread_ts?: unknown
   reply_count?: unknown
   files?: unknown
@@ -327,13 +337,29 @@ export function createWebSlackClient(token: string, slackApiUrl?: string): Requi
           : await requestClient.users.conversations(requestArgs)
         signal?.throwIfAborted()
         for (const ch of (result.channels ?? [])) {
-          if (typeof ch.id === 'string' && typeof ch.name === 'string' && !seen.has(ch.id)) {
-            seen.add(ch.id)
-            const rawChannel = ch as { is_private?: unknown; is_member?: unknown; num_members?: unknown }
+          const rawChannel = ch as {
+            id?: unknown
+            name?: unknown
+            name_normalized?: unknown
+            is_private?: unknown
+            is_group?: unknown
+            is_member?: unknown
+            num_members?: unknown
+          }
+          const chName = typeof rawChannel.name === 'string' && rawChannel.name !== ''
+            ? rawChannel.name
+            : (typeof rawChannel.name_normalized === 'string' && rawChannel.name_normalized !== ''
+              ? rawChannel.name_normalized
+              : undefined)
+          if (typeof rawChannel.id === 'string' && chName !== undefined && !seen.has(rawChannel.id)) {
+            seen.add(rawChannel.id)
+            const isPrivate = typeof rawChannel.is_private === 'boolean'
+              ? rawChannel.is_private
+              : (rawChannel.is_group === true ? true : undefined)
             const info: ChannelInfo = {
-              id: ch.id,
-              name: ch.name,
-              ...(typeof rawChannel.is_private === 'boolean' ? { is_private: rawChannel.is_private } : {}),
+              id: rawChannel.id,
+              name: chName,
+              ...(isPrivate !== undefined ? { is_private: isPrivate } : {}),
               ...(typeof rawChannel.is_member === 'boolean' ? { is_member: rawChannel.is_member } : {}),
               ...(typeof rawChannel.num_members === 'number' && Number.isFinite(rawChannel.num_members)
                 ? { num_members: rawChannel.num_members }
@@ -372,9 +398,10 @@ export function createWebSlackClient(token: string, slackApiUrl?: string): Requi
           channels = await fetchWithTypes('public_channel')
         } catch (fallbackError) {
           signal?.throwIfAborted()
+          const fallbackNeeded = platformNeededScopes(fallbackError)
           if (
             platformErrorCode(fallbackError) === 'missing_scope'
-            && platformNeededScopes(fallbackError).includes('channels:read')
+            && (fallbackNeeded.length === 0 || fallbackNeeded.includes('channels:read'))
           ) {
             channels = await fetchWithTypes('private_channel')
           } else {
@@ -392,7 +419,7 @@ export function createWebSlackClient(token: string, slackApiUrl?: string): Requi
 
   const resolveChannelId = async (channel: string, signal?: AbortSignal): Promise<string> => {
     signal?.throwIfAborted()
-    const trimmed = assertChannel(channel)
+    const trimmed = normalizeChannelInput(assertChannel(channel))
     if (SLACK_CHANNEL_ID_RE.test(trimmed)) return trimmed
 
     const normalized = trimmed.replace(/^#/, '').toLowerCase()
@@ -507,9 +534,20 @@ export function createWebSlackClient(token: string, slackApiUrl?: string): Requi
       const ts = typeof item.ts === 'string' ? item.ts : ''
       if (!ts) continue
       const user = typeof item.user === 'string' && item.user.trim() !== '' ? item.user.trim() : undefined
-      const userName = user !== undefined ? resolvedNames.get(user) : undefined
+      const botProfileName = typeof item.bot_profile?.name === 'string' && item.bot_profile.name.trim() !== ''
+        ? item.bot_profile.name.trim()
+        : undefined
+      const fallbackBotUsername = typeof item.username === 'string' && item.username.trim() !== ''
+        ? item.username.trim()
+        : undefined
+      const userName = (user !== undefined ? resolvedNames.get(user) : undefined)
+        ?? botProfileName
+        ?? fallbackBotUsername
       const botId = typeof item.bot_id === 'string' && item.bot_id.trim() !== '' ? item.bot_id.trim() : undefined
-      const text = typeof item.text === 'string' ? item.text : ''
+      const rawText = typeof item.text === 'string' ? item.text : ''
+      const text = rawText.trim() !== ''
+        ? rawText
+        : extractFallbackMessageText(item.blocks, item.attachments)
       const threadTs = typeof item.thread_ts === 'string' && item.thread_ts.trim() !== '' ? item.thread_ts.trim() : undefined
       const replyCount = typeof item.reply_count === 'number' && Number.isFinite(item.reply_count) ? item.reply_count : undefined
       const files = extractFiles(item.files)
@@ -531,34 +569,62 @@ export function createWebSlackClient(token: string, slackApiUrl?: string): Requi
   return {
     async postMessage(params: PostMessageParams, signal?: AbortSignal): Promise<PostMessageResult> {
       signal?.throwIfAborted()
+      const targetChannel = normalizeChannelInput(params.channel)
       const useMarkdownBlock = params.text.length <= MAX_MARKDOWN_BLOCK_LENGTH
       const fallbackText = truncateFallbackText(params.text, MAX_FALLBACK_TEXT_LENGTH)
-      const sendPlain = () => createClient(signal).chat.postMessage({
-        channel: params.channel,
-        text: params.text,
-        ...(params.thread_ts !== undefined ? { thread_ts: params.thread_ts } : {}),
-      })
 
-      let result
-      if (useMarkdownBlock) {
-        try {
-          result = await createClient(signal).chat.postMessage({
-            channel: params.channel,
-            text: fallbackText,
-            blocks: [{ type: 'markdown' as const, text: params.text }],
-            ...(params.thread_ts !== undefined ? { thread_ts: params.thread_ts } : {}),
-          })
-        } catch (error) {
-          signal?.throwIfAborted()
-          const code = platformErrorCode(error)
-          if (code === 'invalid_blocks' || code === 'invalid_blocks_format' || code === 'msg_blocks_too_long') {
-            result = await sendPlain()
-          } else {
+      const sendToChannel = async (channelId: string) => {
+        const sendPlain = () => createClient(signal).chat.postMessage({
+          channel: channelId,
+          text: params.text,
+          ...(params.thread_ts !== undefined ? { thread_ts: params.thread_ts } : {}),
+        })
+
+        if (useMarkdownBlock) {
+          try {
+            return await createClient(signal).chat.postMessage({
+              channel: channelId,
+              text: fallbackText,
+              blocks: [{ type: 'markdown' as const, text: params.text }],
+              ...(params.thread_ts !== undefined ? { thread_ts: params.thread_ts } : {}),
+            })
+          } catch (error) {
+            signal?.throwIfAborted()
+            const code = platformErrorCode(error)
+            if (code === 'invalid_blocks' || code === 'invalid_blocks_format' || code === 'msg_blocks_too_long') {
+              return await sendPlain()
+            }
             throw error
           }
         }
-      } else {
-        result = await sendPlain()
+        return await sendPlain()
+      }
+
+      let effectiveChannel = targetChannel
+      let result
+      try {
+        result = await sendToChannel(targetChannel)
+      } catch (error) {
+        signal?.throwIfAborted()
+        // 部分私密频道或历史重命名频道按 #频道名 直发会触发 channel_not_found；
+        // 仅在首次请求已被 Slack 明确拒绝（零重复风险）时尝试解析为规范 ID 重发一次。
+        if (platformErrorCode(error) === 'channel_not_found' && !SLACK_CHANNEL_ID_RE.test(targetChannel)) {
+          let resolvedId: string | undefined
+          try {
+            resolvedId = await resolveChannelId(targetChannel, signal)
+          } catch (resolveError) {
+            signal?.throwIfAborted()
+            void resolveError
+          }
+          if (resolvedId !== undefined && resolvedId !== targetChannel) {
+            effectiveChannel = resolvedId
+            result = await sendToChannel(resolvedId)
+          } else {
+            throw error
+          }
+        } else {
+          throw error
+        }
       }
 
       signal?.throwIfAborted()
@@ -566,7 +632,7 @@ export function createWebSlackClient(token: string, slackApiUrl?: string): Requi
       if (!ts) throw new LocalSlackError('Slack 未返回消息回执，无法确认提交结果；请先检查频道，避免直接重发。')
       const resolvedChannel = typeof result.channel === 'string' && result.channel.trim() !== ''
         ? result.channel.trim()
-        : params.channel
+        : effectiveChannel
       return { ts, channel: resolvedChannel }
     },
 
@@ -599,8 +665,12 @@ export function createWebSlackClient(token: string, slackApiUrl?: string): Requi
       signal?.throwIfAborted()
       const channel = await resolveChannelId(params.channel, signal)
       const limit = clampApiLimit(params.limit, 20, 100)
-      const oldest = typeof params.oldest === 'string' && params.oldest.trim() !== '' ? params.oldest.trim() : undefined
-      const latest = typeof params.latest === 'string' && params.latest.trim() !== '' ? params.latest.trim() : undefined
+      const oldest = params.oldest !== undefined && params.oldest !== ''
+        ? normalizeHistoryTimestamp(params.oldest, 'oldest')
+        : undefined
+      const latest = params.latest !== undefined && params.latest !== ''
+        ? normalizeHistoryTimestamp(params.latest, 'latest')
+        : undefined
       const result = await createClient(signal).conversations.history({
         channel,
         limit,
@@ -779,7 +849,20 @@ interface SlackErrorLike {
     error?: unknown
     needed?: unknown
     provided?: unknown
+    response_metadata?: {
+      scopes?: unknown
+      acceptedScopes?: unknown
+      messages?: unknown
+    }
   }
+}
+
+function joinMetadataList(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined
+  const items = value
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter((item) => item !== '')
+  return items.length > 0 ? items.join(', ') : undefined
 }
 
 function describeOriginalError(original: unknown): {
@@ -891,12 +974,17 @@ export function mapSlackError(error: unknown): string {
   if (code === 'token_expired') {
     return 'Slack 令牌已过期（token_expired）：请重新授权或刷新令牌，并在 DSH「设置 → 插件 → Slack（dsh-slack）」更新 token（保存即生效，无需重启）。'
   }
-  if (code === 'token_revoked' || code === 'account_inactive' || code === 'not_authed') {
+  if (code === 'token_revoked' || code === 'account_inactive' || code === 'not_authed' || code === 'invalid_token') {
     return `Slack 令牌不可用（${code}）：当前令牌已被撤销、账号已停用或未携带认证信息。请重新生成或重新授权令牌，并在 DSH「设置 → 插件 → Slack（dsh-slack）」更新 token（保存即生效，无需重启）。`
   }
+  if (code === 'org_login_required' || code === 'team_access_not_granted') {
+    return `Slack 工作区或组织访问受限（${code}）：当前令牌未获得目标工作区/企业组织（Enterprise Grid）的授权，请重新安装或联系组织管理员授权。`
+  }
   if (code === 'missing_scope') {
-    const needed = typeof data?.needed === 'string' && data.needed.trim() !== '' ? data.needed.trim() : undefined
-    const provided = typeof data?.provided === 'string' && data.provided.trim() !== '' ? data.provided.trim() : undefined
+    const needed = (typeof data?.needed === 'string' && data.needed.trim() !== '' ? data.needed.trim() : undefined)
+      ?? joinMetadataList(data?.response_metadata?.acceptedScopes)
+    const provided = (typeof data?.provided === 'string' && data.provided.trim() !== '' ? data.provided.trim() : undefined)
+      ?? joinMetadataList(data?.response_metadata?.scopes)
     if (needed !== undefined) {
       const providedHint = provided !== undefined ? `（当前已授予：${provided}）` : ''
       return `Slack 权限不足（missing_scope）：缺少必需权限 ${needed}${providedHint}。请在 Slack App「OAuth & Permissions → Scopes」勾选上述权限并重新安装（Reinstall）App，获取新令牌后更新 token。`
@@ -912,8 +1000,11 @@ export function mapSlackError(error: unknown): string {
   if (code === 'not_in_channel') {
     return '机器人不在该频道中（not_in_channel）：请先把机器人 App 添加（invite）到该频道。'
   }
-  if (code === 'is_archived') {
-    return '频道已归档（is_archived）：机器人不能在已归档频道发消息，请改用其他频道。'
+  if (code === 'is_archived' || code === 'channel_is_archived') {
+    return `频道已归档（${code}）：机器人不能在已归档频道执行此操作，请改用其他频道。`
+  }
+  if (code === 'messages_tab_disabled') {
+    return 'App 私信标签页未启用（messages_tab_disabled）：请在 Slack App「App Home」开启 Messages Tab 并关闭只读（或导入 slack-app-manifest.yaml 预设配置）。'
   }
   if (code === 'msg_too_long') {
     return '消息过长（msg_too_long）：Slack 单条消息不能超过 40,000 字符，请精简后重试。'
@@ -922,7 +1013,12 @@ export function mapSlackError(error: unknown): string {
     return '消息 Markdown 块过长（msg_blocks_too_long）：单个 Markdown 渲染块超过 Slack 12,000 字符上限，请精简内容或分段发送。'
   }
   if (code === 'invalid_blocks' || code === 'invalid_blocks_format') {
-    return `消息块格式无效（${code}）：Slack 无法解析当前 Markdown / Block Kit 结构，请简化特殊排版语法后重试。`
+    const metaMsgs = joinMetadataList(data?.response_metadata?.messages)
+    const detail = metaMsgs !== undefined ? `（${metaMsgs}）` : ''
+    return `消息块格式无效（${code}）${detail}：Slack 无法解析当前 Markdown / Block Kit 结构，请简化特殊排版语法后重试。`
+  }
+  if (code === 'markdown_text_conflict') {
+    return '消息格式冲突（markdown_text_conflict）：Slack 不允许同时传递互斥的 Markdown 与 Block Kit 载荷，请精简消息内容后重试。'
   }
   if (code === 'already_reacted') {
     return '已添加过该表情回应（already_reacted）：当前机器人已对此消息添加过相同表情，无需重复添加。'
@@ -930,14 +1026,23 @@ export function mapSlackError(error: unknown): string {
   if (code === 'no_reaction') {
     return '表情回应不存在（no_reaction）：目标消息上未找到对应的表情回应。'
   }
+  if (code === 'too_many_reactions') {
+    return '表情回应数量达到上限（too_many_reactions）：目标消息上的表情种类或数量已达到 Slack 限制。'
+  }
   if (code === 'invalid_name') {
     return '表情名称无效（invalid_name）：请检查 Slack 表情名称拼写（如 thumbsup、white_check_mark，不含两侧冒号）。'
   }
   if (code === 'message_not_found') {
     return '消息未找到（message_not_found）：目标时间戳（ts）对应的消息不存在或已被删除，请确认 channel 与 ts 是否匹配。'
   }
-  if (code === 'thread_not_found') {
-    return '线程未找到（thread_not_found）：目标 thread_ts 对应的线程不存在或已被删除，请确认 channel 与 thread_ts 是否正确。'
+  if (code === 'thread_not_found' || code === 'cannot_reply_to_message') {
+    return `线程未找到或无法回复（${code}）：目标 thread_ts 对应的线程不存在、已被删除或不支持回复，请确认 channel 与 thread_ts 是否正确。`
+  }
+  if (code === 'invalid_ts_oldest' || code === 'invalid_ts_latest') {
+    return `时间范围参数无效（${code}）：请传入合法的 Slack 时间戳（如 1700000000.000100）或 ISO-8601 时间（如 2026-11-26T00:00:00Z）。`
+  }
+  if (code === 'restricted_action' || code === 'ekm_access_denied') {
+    return `工作区策略限制了该操作（${code}）：当前 Slack 频道或企业安全策略禁止机器人执行此操作，请联系工作区管理员。`
   }
   if (code === 'file_uploads_disabled') {
     return '工作区已禁用文件上传（file_uploads_disabled）：当前 Slack 工作区策略不允许上传文件，请联系工作区管理员。'
@@ -951,6 +1056,19 @@ export function mapSlackError(error: unknown): string {
     return 'Slack 返回 HTTP 429（限流）：请求过于频繁，但响应未包含有效的 Retry-After 等待秒数，请稍等几秒后重试。'
   }
   return message ? `Slack API 调用失败：${message}` : 'Slack API 调用失败：未知错误。'
+}
+
+/**
+ * 规整频道输入：提取 Slack 频道提及（如 <#C01234567|general>）与 channel: 前缀中的规范频道 ID，
+ * 其他频道名（如 #general）或规范 ID 原样去首尾空白返回。
+ */
+export function normalizeChannelInput(channel: string): string {
+  const trimmed = channel.trim()
+  const mention = SLACK_CHANNEL_MENTION_RE.exec(trimmed)
+  if (mention?.[1]) return mention[1].toUpperCase()
+  const prefixed = SLACK_CHANNEL_PREFIX_RE.exec(trimmed)
+  if (prefixed?.[1]) return prefixed[1].toUpperCase()
+  return trimmed
 }
 
 /** 校验 channel 参数：必须是非空字符串（频道名或频道 ID）。 */
@@ -985,7 +1103,218 @@ export function assertTimestamp(timestamp: unknown, fieldName = 'timestamp'): st
   return timestamp.trim()
 }
 
-/** 校验并规整 Slack 表情回应名称（自动去除两侧冒号）。 */
+function utcEpochSeconds(
+  year: number,
+  month: number,
+  day: number,
+  hour = 0,
+  minute = 0,
+  second = 0,
+): number {
+  const date = new Date(0)
+  date.setUTCFullYear(year, month - 1, day)
+  date.setUTCHours(hour, minute, second, 0)
+  return date.getTime() / 1000
+}
+
+function isValidUtcCalendarDate(year: number, month: number, day: number): boolean {
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false
+  const check = new Date(0)
+  check.setUTCFullYear(year, month - 1, day)
+  check.setUTCHours(0, 0, 0, 0)
+  return (
+    check.getUTCFullYear() === year
+    && check.getUTCMonth() === month - 1
+    && check.getUTCDate() === day
+  )
+}
+
+/**
+ * 规整历史查询边界时间戳（oldest / latest）：
+ * - 直接透传标准 Slack 数字时间戳（如 1700000000.000100 或 1700000000）；
+ * - 自动将 ISO-8601 日期/时间（如 2026-11-26T00:00:00Z、2026-11-26T08:00:00+08:00、
+ *   2026-11-26T00:00:00.000100Z 或 2026-11-26）转为 Unix 秒时间戳，保留 Slack 6 位微秒精度；
+ * - 其他非法格式抛出清晰中文错误，避免把不可解析文本发给 Slack 触发 invalid_ts_oldest/latest。
+ */
+export function normalizeHistoryTimestamp(value: unknown, fieldName = 'timestamp'): string {
+  const trimmed = assertTimestamp(value, fieldName)
+  if (SLACK_NUMERIC_TS_RE.test(trimmed)) return trimmed
+
+  const dateMatch = ISO_DATE_ONLY_RE.exec(trimmed)
+  if (dateMatch) {
+    const year = Number(dateMatch[1])
+    const month = Number(dateMatch[2])
+    const day = Number(dateMatch[3])
+    if (isValidUtcCalendarDate(year, month, day)) {
+      const seconds = utcEpochSeconds(year, month, day)
+      if (Number.isFinite(seconds) && seconds >= 0) return String(seconds)
+    }
+    throw new LocalSlackError(`${fieldName} 参数错误：日期「${trimmed}」无效，请传入合法的 Slack 时间戳（如 1700000000.000100）或 ISO-8601 时间（如 2026-11-26T00:00:00Z）。`)
+  }
+
+  const dtMatch = ISO_DATETIME_TZ_RE.exec(trimmed)
+  if (dtMatch) {
+    const year = Number(dtMatch[1])
+    const month = Number(dtMatch[2])
+    const day = Number(dtMatch[3])
+    const hour = Number(dtMatch[4])
+    const minute = Number(dtMatch[5])
+    const second = dtMatch[6] !== undefined ? Number(dtMatch[6]) : 0
+    const rawFrac = dtMatch[7]
+    const tzSign = dtMatch[9]
+    const tzHour = dtMatch[10] !== undefined ? Number(dtMatch[10]) : 0
+    const tzMinute = dtMatch[11] !== undefined ? Number(dtMatch[11]) : 0
+    const validParts = isValidUtcCalendarDate(year, month, day)
+      && hour <= 23
+      && minute <= 59
+      && second <= 59
+      && tzHour <= 23
+      && tzMinute <= 59
+    if (validParts) {
+      const tzOffsetSeconds = tzSign === undefined
+        ? 0
+        : (tzSign === '+' ? 1 : -1) * (tzHour * 3600 + tzMinute * 60)
+      const wholeSeconds = utcEpochSeconds(year, month, day, hour, minute, second) - tzOffsetSeconds
+      if (Number.isFinite(wholeSeconds) && wholeSeconds >= 0) {
+        const microFrac = rawFrac !== undefined
+          ? rawFrac.slice(0, 6).replace(/0+$/, '')
+          : ''
+        return microFrac !== '' ? `${wholeSeconds}.${microFrac}` : String(wholeSeconds)
+      }
+    }
+  }
+
+  throw new LocalSlackError(`${fieldName} 参数错误：「${trimmed}」不是有效的 Slack 时间戳或 ISO-8601 时间（示例：1700000000.000100 或 2026-11-26T00:00:00Z）。`)
+}
+
+const SLACK_EMOJI_SKIN_TONE_MODIFIER_RE = /[\u{1F3FB}-\u{1F3FF}]/gu
+const SLACK_EMOJI_VARIATION_SELECTOR_RE = /[\uFE0E\uFE0F]/g
+const SLACK_EMOJI_SKIN_TONE_BY_MODIFIER = new Map<string, number>([
+  ['🏻', 2],
+  ['🏼', 3],
+  ['🏽', 4],
+  ['🏾', 5],
+  ['🏿', 6],
+])
+
+// Slack reactions.add 仅对支持肤色的手势/人物表情接受 ::skin-tone-2..6 后缀。
+const SLACK_EMOJI_SKIN_TONE_CAPABLE = new Set<string>([
+  'thumbsup',
+  'thumbsdown',
+  'pray',
+  'male-technologist',
+  'female-technologist',
+  'writing_hand',
+  'clap',
+  'ok_hand',
+  'muscle',
+  'raised_hands',
+  'wave',
+  'v',
+  'crossed_fingers',
+  'handshake',
+])
+
+// Slack reactions.add 仅接受短码（如 white_check_mark / thumbsup），不接受原始 Unicode 表情字符。
+// 模型经常直接传入 Unicode 表情，这里自动映射高频表情并保留合法的肤色修饰符。
+const SLACK_EMOJI_SHORTNAME_BY_GLYPH = new Map<string, string>([
+  ['✅', 'white_check_mark'],
+  ['✔', 'heavy_check_mark'],
+  ['☑', 'ballot_box_with_check'],
+  ['❌', 'x'],
+  ['👍', 'thumbsup'],
+  ['👎', 'thumbsdown'],
+  ['🎉', 'tada'],
+  ['🎊', 'confetti_ball'],
+  ['❤', 'heart'],
+  ['🧡', 'orange_heart'],
+  ['💛', 'yellow_heart'],
+  ['💚', 'green_heart'],
+  ['💙', 'blue_heart'],
+  ['💜', 'purple_heart'],
+  ['💔', 'broken_heart'],
+  ['😄', 'smile'],
+  ['😊', 'blush'],
+  ['😂', 'joy'],
+  ['🤣', 'rolling_on_the_floor_laughing'],
+  ['😅', 'sweat_smile'],
+  ['😉', 'wink'],
+  ['😎', 'sunglasses'],
+  ['🥳', 'partying_face'],
+  ['😢', 'cry'],
+  ['😭', 'sob'],
+  ['😡', 'rage'],
+  ['🤯', 'exploding_head'],
+  ['🫡', 'saluting_face'],
+  ['🚀', 'rocket'],
+  ['👀', 'eyes'],
+  ['🙏', 'pray'],
+  ['🙌', 'raised_hands'],
+  ['👋', 'wave'],
+  ['🤝', 'handshake'],
+  ['✌', 'v'],
+  ['🤞', 'crossed_fingers'],
+  ['🔥', 'fire'],
+  ['✨', 'sparkles'],
+  ['💯', '100'],
+  ['⚠', 'warning'],
+  ['❓', 'question'],
+  ['❗', 'exclamation'],
+  ['‼', 'bangbang'],
+  ['➕', 'heavy_plus_sign'],
+  ['➖', 'heavy_minus_sign'],
+  ['🤔', 'thinking_face'],
+  ['👨‍💻', 'male-technologist'],
+  ['👨💻', 'male-technologist'],
+  ['👩‍💻', 'female-technologist'],
+  ['👩💻', 'female-technologist'],
+  ['⚡', 'zap'],
+  ['🌐', 'globe_with_meridians'],
+  ['😱', 'scream'],
+  ['🥱', 'yawning_face'],
+  ['😨', 'fearful'],
+  ['⏳', 'hourglass_flowing_sand'],
+  ['⏰', 'alarm_clock'],
+  ['✍', 'writing_hand'],
+  ['🗜', 'compression'],
+  ['🧠', 'brain'],
+  ['🛠', 'hammer_and_wrench'],
+  ['💻', 'computer'],
+  ['🤖', 'robot_face'],
+  ['👏', 'clap'],
+  ['👌', 'ok_hand'],
+  ['💪', 'muscle'],
+  ['⭐', 'star'],
+  ['📌', 'pushpin'],
+  ['📎', 'paperclip'],
+  ['🐛', 'bug'],
+  ['🔧', 'wrench'],
+  ['📝', 'memo'],
+  ['💡', 'bulb'],
+  ['🎯', 'dart'],
+  ['🏁', 'checkered_flag'],
+  ['🏆', 'trophy'],
+  ['🥇', 'first_place_medal'],
+  ['🔄', 'arrows_counterclockwise'],
+  ['📦', 'package'],
+  ['🚧', 'construction'],
+  ['🧪', 'test_tube'],
+  ['📊', 'bar_chart'],
+  ['📈', 'chart_with_upwards_trend'],
+  ['📉', 'chart_with_downwards_trend'],
+  ['📣', 'mega'],
+  ['🔔', 'bell'],
+  ['🔒', 'lock'],
+  ['🔓', 'unlock'],
+  ['🔑', 'key'],
+  ['☕', 'coffee'],
+  ['🔴', 'red_circle'],
+  ['🟡', 'large_yellow_circle'],
+  ['🟢', 'large_green_circle'],
+  ['🔵', 'large_blue_circle'],
+])
+
+/** 校验并规整 Slack 表情回应名称（自动去除两侧冒号，并将常见 Unicode 表情转换为 Slack 短码）。 */
 export function assertReactionName(name: unknown): string {
   if (typeof name !== 'string') {
     throw new LocalSlackError('name 参数错误：必须是 Slack 表情名称字符串（如 thumbsup、white_check_mark）。')
@@ -994,5 +1323,17 @@ export function assertReactionName(name: unknown): string {
   if (cleaned === '' || /\s/.test(cleaned)) {
     throw new LocalSlackError('name 参数错误：必须是有效的 Slack 表情名称（如 thumbsup、white_check_mark，不含空白字符）。')
   }
-  return cleaned
+  const skinModifiers = cleaned.match(SLACK_EMOJI_SKIN_TONE_MODIFIER_RE)
+  const skinModifier = skinModifiers?.[0]
+  const glyphKey = cleaned
+    .replace(SLACK_EMOJI_SKIN_TONE_MODIFIER_RE, '')
+    .replace(SLACK_EMOJI_VARIATION_SELECTOR_RE, '')
+  const mapped = SLACK_EMOJI_SHORTNAME_BY_GLYPH.get(glyphKey)
+  if (mapped !== undefined) {
+    const tone = skinModifier && SLACK_EMOJI_SKIN_TONE_CAPABLE.has(mapped)
+      ? SLACK_EMOJI_SKIN_TONE_BY_MODIFIER.get(skinModifier)
+      : undefined
+    return tone !== undefined ? `${mapped}::skin-tone-${tone}` : mapped
+  }
+  return /^[A-Za-z0-9_+-]+(?:::[A-Za-z0-9_-]+)?$/.test(cleaned) ? cleaned.toLowerCase() : cleaned
 }

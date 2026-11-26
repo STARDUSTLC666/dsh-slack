@@ -1,0 +1,74 @@
+# DeepSeek Harness Slack Plugin (dsh-slack) — One-Click App Manifest
+#
+# 快速导入（30 秒配好）：
+#   1. 打开 https://api.slack.com/apps → Create New App → From a manifest → 选择工作区
+#   2. 切换到 YAML 标签页，粘贴本文件全文 → Next → Create
+#   3. 左侧 Install App → Install to Workspace → 复制 Bot User OAuth Token（xoxb-...）填入 DSH 的 token
+#   4. 如需 Socket Mode 收件箱（slack_inbox）：
+#      左侧 Basic Information → App-Level Tokens → Generate Token and Scopes → 勾选 connections:write
+#      → 复制 App-Level Token（xapp-...）填入 DSH 的 appToken
+#   5. 在目标频道运行 /invite @DSH Slack，即可使用全部 9 个工具（发信、回复、列频道、历史、线程、上传、表情、收件箱、自检）
+#
+# Quick import (30-second setup):
+#   1. Open https://api.slack.com/apps -> Create New App -> From a manifest -> choose workspace
+#   2. Select YAML, paste this file -> Next -> Create
+#   3. Install App -> Install to Workspace -> copy Bot User OAuth Token (xoxb-...) into DSH `token`
+#   4. Optional (for Socket Mode `slack_inbox`):
+#      Basic Information -> App-Level Tokens -> Generate Token and Scopes -> add `connections:write`
+#      -> copy App-Level Token (xapp-...) into DSH `appToken`
+#   5. Run `/invite @DSH Slack` in your target channels, then verify with `slack_health(verify=true)`
+
+display_information:
+  name: DSH Slack
+  description: DeepSeek Harness Slack integration for notifications, history, threads, file uploads, reactions, and Socket Mode inbox.
+  background_color: "#1f2937"
+
+features:
+  app_home:
+    home_tab_enabled: false
+    messages_tab_enabled: true
+    # 必须为 false，否则用户无法在 App 的 Messages 标签页向机器人发私信（DM）
+    messages_tab_read_only_enabled: false
+  bot_user:
+    display_name: DSH Slack
+    always_online: true
+
+oauth_config:
+  scopes:
+    bot:
+      # 事件订阅 app_mention 必需（缺失会导致 Manifest 校验失败）
+      - app_mentions:read
+      # 公开频道列表、历史读取、线程上下文与 message.channels 事件
+      - channels:history
+      - channels:read
+      # 发送消息与线程回复（slack_notify / slack_reply）
+      - chat:write
+      # 文件上传（slack_upload -> filesUploadV2）
+      - files:write
+      # 私密频道列表、历史读取、线程上下文与 message.groups 事件
+      - groups:history
+      - groups:read
+      # 私信历史读取与 message.im 事件
+      - im:history
+      - im:read
+      # 多人私信历史读取与 message.mpim 事件
+      - mpim:history
+      - mpim:read
+      # 表情回应（slack_react -> reactions.add）
+      - reactions:write
+      # 可选：读取历史/线程时将用户 ID（U...）解析为显示昵称
+      - users:read
+
+settings:
+  event_subscriptions:
+    bot_events:
+      - app_mention
+      - message.channels
+      - message.groups
+      - message.im
+      - message.mpim
+  interactivity:
+    is_enabled: false
+  org_deploy_enabled: false
+  socket_mode_enabled: true
+  token_rotation_enabled: false

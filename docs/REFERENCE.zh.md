@@ -16,12 +16,12 @@
 
 ## 功能
 
-- 向频道或线程发送原生 Markdown 通知（`slack_notify` / `slack_reply`），超 12,000 字符自动安全降级为纯文本。
+- 向频道或线程发送原生 Markdown 通知（`slack_notify` / `slack_reply`），超 12,000 字符自动安全降级为纯文本，私密频道按名发送遇 `channel_not_found` 自动回退按 ID 重试。
 - 按范围列出机器人已加入或工作区可见频道（`slack_channels`），自动排除归档频道并支持权限不足时降级公开频道。
-- 读取频道历史与完整线程上下文（`slack_history` / `slack_thread`），支持 `#频道名` 解析与发送者昵称补全。
-- 上传文本内容或本地文件到频道/线程（`slack_upload`，基于 `filesUploadV2`），以及为消息添加表情回应（`slack_react`）。
-- 可选 Socket Mode 双向收件箱（`slack_inbox`），支持公开/私密频道、私信、`@提及`、线程广播与文件分享，自动去重并过滤机器人自身消息。
-- 连接与凭据自检（`slack_health`），默认离线检查前缀/URL/连接状态，传入 `verify=true` 时在线调用 `auth.test` 核验身份与已授予权限。
+- 读取频道历史与完整线程上下文（`slack_history` / `slack_thread`），支持 `#频道名` / `<#ID|name>` / `channel:ID` 解析、ISO-8601 时间边界、Block Kit / 告警附件兜底文本提取与发送者昵称补全。
+- 上传文本内容或本地文件到频道/线程（`slack_upload`，基于 `filesUploadV2`），以及为消息添加表情回应（`slack_react`，自动将常见 Unicode 表情转为 Slack 短码）。
+- 可选 Socket Mode 双向收件箱（`slack_inbox`），支持公开/私密频道、私信、`@提及`、线程广播、文件分享与纯 Block Kit 消息，自动去重并过滤机器人自身消息。
+- 连接与凭据自检（`slack_health`），默认离线检查前缀/URL/连接状态（含多实例并发连接提醒），传入 `verify=true` 时在线调用 `auth.test` 核验身份与已授予权限。
 
 ## 安装
 
@@ -35,7 +35,7 @@ dsh plugin --profile desktop add dsh-slack
 
 ## 开始使用
 
-1. 为自己的 Slack App 配置所需权限与可选 Socket Mode，取得 Bot Token（`xoxb-`）和可选 App-Level Token（`xapp-`）。
+1. 打开 <https://api.slack.com/apps> → **Create New App → From a manifest**，粘贴仓库根目录的 [`slack-app-manifest.yaml`](../slack-app-manifest.yaml) 一键创建 Slack App，安装后取得 Bot Token（`xoxb-`）和可选 App-Level Token（`xapp-`，需 `connections:write`）。
 2. 在 DSH 的 Slack 设置中填写令牌，运行 `slack_health`（可加 `verify=true`）核验连接与权限状态。
 3. 先在自己的测试频道验证发信、历史读取或收件，再让助手整理消息、上传附件或准备线程回复。
 4. 核对目标频道、线程和正文后发送；在 Slack 中检查结果，断线或超时时先看状态再重试。

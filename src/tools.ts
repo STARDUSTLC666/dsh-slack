@@ -17,6 +17,7 @@ import {
   assertThreadTs,
   assertTimestamp,
   mapSlackError,
+  normalizeHistoryTimestamp,
 } from './slack-client.js'
 import type { InboxMessage, InboxQueue } from './inbox.js'
 import type { SocketStatus } from './socket.js'
@@ -197,9 +198,9 @@ function resolveTargetChannel(rawChannel: unknown, config: SlackConfig | undefin
   return assertChannel(explicitChannel)
 }
 
-function assertOptionalTs(value: unknown, fieldName: string): string | undefined {
+function assertOptionalHistoryTs(value: unknown, fieldName: string): string | undefined {
   if (value === undefined || value === null || value === '') return undefined
-  return assertTimestamp(value, fieldName)
+  return normalizeHistoryTimestamp(value, fieldName)
 }
 
 function assertFilename(value: unknown): string {
@@ -310,7 +311,7 @@ export function buildHealthTool(deps: ToolDeps): ToolDefinition {
             lines.push('  · 代理环境变量无效：HTTP_PROXY / HTTPS_PROXY 必须为合法的 http:// 或 https:// URL（暂不支持 socks5:// / ftp:// 等协议），请更正或清理无效环境变量。')
           }
           if (failed.has('Socket Mode')) {
-            lines.push('  · Socket Mode 未连上：确认 App-Level Token 为 xapp- 开头、slackApiUrl 合法、App 已开启 Socket Mode 并订阅 message.channels / message.groups / message.im / message.mpim / app_mention；invalid_auth 需要重新生成令牌并在「设置 → 插件 → Slack」更新 appToken。')
+            lines.push('  · Socket Mode 未连上：确认 App-Level Token 为 xapp- 开头（具备 connections:write）、slackApiUrl 合法、App 已开启 Socket Mode 并订阅 message.channels / message.groups / message.im / message.mpim / app_mention（需配 app_mentions:read）；invalid_auth 需要重新生成令牌并在「设置 → 插件 → Slack」更新 appToken。')
           }
           if (failed.has('在线鉴权（auth.test）')) {
             lines.push('  · 在线鉴权失败：请按上方错误提示检查令牌状态、已授予权限或网络连通性，修复后再次运行 slack_health(verify=true)。')
@@ -390,6 +391,11 @@ export function buildHealthTool(deps: ToolDeps): ToolDefinition {
 
       const socket = deps.socketStatusProvider?.()
       if (appToken !== '') {
+        const socketSharedHint = socket?.state === 'connected'
+          && typeof socket.activeConnections === 'number'
+          && socket.activeConnections > 1
+          ? `（注意：检测到 ${socket.activeConnections} 个并发连接，Slack 会将事件分流到不同实例）`
+          : ''
         checks.push({
           name: 'Socket Mode',
           ok: appTokenValid && apiUrlValid && socket?.state === 'connected',
@@ -398,7 +404,7 @@ export function buildHealthTool(deps: ToolDeps): ToolDefinition {
             : !apiUrlValid
               ? '未启动：slackApiUrl 格式无效，已跳过 Socket Mode 连接（避免误连公共 Slack 服务）'
               : socket
-                ? SOCKET_STATE_LABELS[socket.state] + (socket.error ? '（' + socket.error + '）' : '')
+                ? SOCKET_STATE_LABELS[socket.state] + (socket.error ? '（' + socket.error + '）' : '') + socketSharedHint
                 : '仅检查配置，尚未确认连接',
         })
       }
@@ -718,8 +724,8 @@ export function buildHistoryTool(deps: ToolDeps): ToolDefinition {
   const parameters = compileParameters({
     channel: { type: 'string', required: true, description: '目标频道：频道名（如 #general）或频道 ID（如 C01234567）。' },
     limit: { type: 'integer', description: '最多返回的消息数（默认 20，范围 1-100）。' },
-    oldest: { type: 'string', description: '可选：起始时间戳 ts（只返回晚于该时间的消息）。' },
-    latest: { type: 'string', description: '可选：截止时间戳 ts（只返回早于该时间的消息）。' },
+    oldest: { type: 'string', description: '可选：起始时间边界，支持 Slack 时间戳 ts（如 1700000000.000100）或 ISO-8601 时间（如 2026-11-26T00:00:00Z），只返回晚于该时间的消息。' },
+    latest: { type: 'string', description: '可选：截止时间边界，支持 Slack 时间戳 ts 或 ISO-8601 时间，只返回早于该时间的消息。' },
   })
 
   const output: ToolOutputDefinition = {
@@ -751,8 +757,8 @@ export function buildHistoryTool(deps: ToolDeps): ToolDefinition {
       const raw = asRecord(args)
       const channel = assertChannel(raw.channel)
       const limit = clampRange(raw.limit, 20, 1, 100)
-      const oldest = assertOptionalTs(raw.oldest, 'oldest')
-      const latest = assertOptionalTs(raw.latest, 'latest')
+      const oldest = assertOptionalHistoryTs(raw.oldest, 'oldest')
+      const latest = assertOptionalHistoryTs(raw.latest, 'latest')
       const client = deps.clientProvider()
       if (typeof client.getHistory !== 'function') {
         throw new Error('当前 Slack 客户端不支持历史消息读取（getHistory）。')
@@ -947,7 +953,7 @@ export function buildReactTool(deps: ToolDeps): ToolDefinition {
   const parameters = compileParameters({
     channel: { type: 'string', required: true, description: '目标频道：频道名（如 #general）或频道 ID（如 C01234567）。' },
     timestamp: { type: 'string', required: true, description: '目标消息的时间戳 ts（如 1700000000.000100）。' },
-    name: { type: 'string', required: true, description: '表情名称（如 thumbsup、white_check_mark 或 eyes）。' },
+    name: { type: 'string', required: true, description: '表情名称（如 thumbsup、white_check_mark、eyes，或常见 Unicode 表情如 👍、✅、👀，自动转为 Slack 短码）。' },
   })
 
   const output: ToolOutputDefinition = {

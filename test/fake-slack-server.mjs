@@ -117,7 +117,7 @@ export function startFakeSlackServer(port = 3999) {
             bot_id: 'B001',
           },
           {
-            'X-OAuth-Scopes': 'chat:write,channels:read,groups:read,channels:history,files:write,reactions:write,users:read',
+            'X-OAuth-Scopes': 'app_mentions:read,chat:write,channels:read,groups:read,im:read,mpim:read,channels:history,groups:history,im:history,mpim:history,files:write,reactions:write,users:read',
           },
         )
       }

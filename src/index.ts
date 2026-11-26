@@ -55,6 +55,8 @@ export {
 export {
   createWebSlackClient,
   mapSlackError,
+  normalizeChannelInput,
+  normalizeHistoryTimestamp,
   assertChannel,
   assertText,
   assertThreadTs,
@@ -75,6 +77,7 @@ export {
   type UploadFileResult,
   type AddReactionParams,
 } from './slack-client.js'
+export { extractFallbackMessageText } from './message-text.js'
 export {
   buildNotifyTool,
   buildChannelsTool,

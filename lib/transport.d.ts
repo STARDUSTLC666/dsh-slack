@@ -40,9 +40,14 @@ export declare function hasProxyEnv(env?: NodeJS.ProcessEnv): boolean;
  */
 export declare function createProxyDispatcher(env?: NodeJS.ProcessEnv): Dispatcher | undefined;
 /**
+ * 为 @slack/socket-mode 创建与该包自身 undici 副本匹配的代理分发器。
+ * 单 undici 副本下与 createProxyDispatcher 完全等价；多 undici 副本宿主下可避免 WebSocket 握手因跨副本 Symbol 不匹配失败。
+ */
+export declare function createSocketModeProxyDispatcher(env?: NodeJS.ProcessEnv): Dispatcher | undefined;
+/**
  * 构建绑定单次调用 AbortSignal 与可选代理分发的 WHATWG fetch 包装。
  * - 若调用方传入 options.dispatcher，则直接复用该自管生命周期分发器；
  * - 否则在存在合法 HTTP(S) 代理环境变量时复用模块级有界 EnvHttpProxyAgent 缓存；
- * - 经由 undici.fetch 发送 FormData 时自动转换 globalThis.FormData，防止二进制文件上传被破坏。
+ * - 自动剥离无参 POST 的空字符串 body（防止 Undici HTTP/2 流挂起），并转换 globalThis.FormData 保证二进制上传无损。
  */
 export declare function createTransportFetch(signal?: AbortSignal, env?: NodeJS.ProcessEnv, options?: TransportFetchOptions): typeof fetch;

@@ -2,7 +2,12 @@
 import { SocketModeClient } from '@slack/socket-mode'
 import { isValidSlackApiUrl } from './config.js'
 import { parseMessageEvent, type InboxMessage } from './inbox.js'
-import { createProxyDispatcher, createSilentSlackLogger, createTransportFetch, inspectProxyEnv } from './transport.js'
+import {
+  createSilentSlackLogger,
+  createSocketModeProxyDispatcher,
+  createTransportFetch,
+  inspectProxyEnv,
+} from './transport.js'
 
 export interface SocketMessageHandler { onMessage(message: InboxMessage): void }
 type Warn = (message: string, ...args: unknown[]) => void
@@ -10,15 +15,23 @@ export interface SocketStatus {
   state: 'connecting' | 'connected' | 'reconnecting' | 'auth_failed' | 'stopped'
   attempts: number
   error?: string
+  /** 当 Slack hello 帧回报 >1 个并发连接时记录，提示事件可能被多实例分流。 */
+  activeConnections?: number
 }
 export interface SocketClientLike {
   on(event: string, listener: (...args: unknown[]) => void): unknown
   start(): Promise<unknown>
   disconnect(): Promise<unknown>
+  listeners?(event: string): Array<(...args: unknown[]) => unknown>
+  off?(event: string, listener: (...args: unknown[]) => void): unknown
+  removeListener?(event: string, listener: (...args: unknown[]) => void): unknown
+  send?(envelopeId: string, body?: unknown): Promise<unknown>
 }
 export interface SocketLifecycleOptions {
   retryBaseMs?: number
   jitter?: boolean
+  /** WebSocket 客户端 pong 超时（毫秒）；默认 15,000ms，避免公网/代理抖动触发 SDK 默认 5s 误断连。 */
+  clientPingTimeoutMs?: number
   slackApiUrl?: string
   botUserId?: string
   botUserIdProvider?: () => string | undefined
@@ -30,6 +43,8 @@ export type SocketDisposer = (() => void) & { status(): SocketStatus }
 type SocketClientOptionsArg = NonNullable<ConstructorParameters<typeof SocketModeClient>[0]>
 type SocketWebClientOptions = NonNullable<SocketClientOptionsArg['clientOptions']>
 
+const DEFAULT_CLIENT_PING_TIMEOUT_MS = 15000
+
 const AUTH_ERRORS = new Set([
   'invalid_auth',
   'not_authed',
@@ -40,7 +55,36 @@ const AUTH_ERRORS = new Set([
   'token_expired',
   'missing_scope',
   'not_allowed_token_type',
+  'org_login_required',
+  'team_access_not_granted',
+  'cannot_find_service',
+  'invalid_token',
 ])
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function parseSocketEnvelope(data: unknown): Record<string, unknown> | null {
+  let text: string
+  if (typeof data === 'string') {
+    text = data
+  } else if (Buffer.isBuffer(data)) {
+    text = data.toString('utf8')
+  } else if (data instanceof ArrayBuffer) {
+    text = new TextDecoder().decode(data)
+  } else if (ArrayBuffer.isView(data)) {
+    text = new TextDecoder().decode(data)
+  } else {
+    return null
+  }
+  try {
+    const parsed: unknown = JSON.parse(text)
+    return isPlainObject(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
 
 function errorCode(error: unknown): string {
   const value = error as { data?: { error?: unknown }; code?: unknown } | null
@@ -86,11 +130,13 @@ export function startSocketModeClient(
   }
 
   const silentLogger = createSilentSlackLogger()
-  const dispatcher = createProxyDispatcher()
+  const dispatcher = createSocketModeProxyDispatcher()
 
   let status: SocketStatus = { state: 'connecting', attempts: 0 }
   let stopped = false, fatal = false, connecting = false, needsRetry = false, failures = 0
   let dispatcherClosed = false
+  let activeConnections: number | undefined
+  let warnedSharedConnections = false
   let retry: ReturnType<typeof setTimeout> | undefined
   let attemptController: AbortController | undefined
 
@@ -107,6 +153,10 @@ export function startSocketModeClient(
     return response
   }
 
+  const clientPingTimeout = Number.isFinite(options.clientPingTimeoutMs)
+    ? Math.max(1000, Math.min(60000, Math.trunc(options.clientPingTimeoutMs!)))
+    : DEFAULT_CLIENT_PING_TIMEOUT_MS
+
   const clientOptions = {
     timeout: 15000,
     retryConfig: { retries: 0 },
@@ -119,6 +169,7 @@ export function startSocketModeClient(
   const clientConfig: SocketClientOptionsArg = {
     appToken,
     autoReconnectEnabled: false,
+    clientPingTimeout,
     logger: silentLogger as unknown as SocketClientOptionsArg['logger'],
     ...(dispatcher !== undefined ? { dispatcher } : {}),
     clientOptions,
@@ -127,6 +178,78 @@ export function startSocketModeClient(
   const client = (options.createClient ?? (config => new SocketModeClient(config)))(clientConfig)
   const retryBase = Number.isFinite(options.retryBaseMs) ? Math.max(1, Math.min(30000, options.retryBaseMs!)) : 1000
   const jitterEnabled = options.jitter !== false
+
+  // 防护 @slack/socket-mode 3.x 已知崩溃缺陷：当 Slack 下发不含 event 的 events_api 控制包
+  // （如 app_rate_limited）时，SDK 的 async onWebSocketMessage 会直接解引用 payload.event.type
+  // 导致未捕获 Promise 拒绝；同时在 hello 帧检测 num_connections > 1 提醒多实例分流。
+  const originalWsListeners = typeof client.listeners === 'function'
+    ? [...client.listeners('ws_message')]
+    : []
+  for (const listener of originalWsListeners) {
+    if (typeof client.off === 'function') client.off('ws_message', listener)
+    else if (typeof client.removeListener === 'function') client.removeListener('ws_message', listener)
+  }
+  client.on('ws_message', (data: unknown, isBinary?: unknown) => {
+    if (isBinary !== true) {
+      const envelope = parseSocketEnvelope(data)
+      if (envelope !== null) {
+        if (envelope.type === 'hello') {
+          const count = envelope.num_connections
+          if (typeof count === 'number' && Number.isSafeInteger(count) && count >= 0) {
+            activeConnections = count
+            if (status.state === 'connected') {
+              status = {
+                state: 'connected',
+                attempts: status.attempts,
+                ...(count > 1 ? { activeConnections: count } : {}),
+              }
+            }
+            if (count <= 1) {
+              warnedSharedConnections = false
+            } else if (!warnedSharedConnections && !stopped && !fatal) {
+              warnedSharedConnections = true
+              log(`检测到当前 Slack App 存在 ${count} 个并发 Socket Mode 连接，Slack 会将事件分流到不同连接；如出现收件箱漏收消息，请检查是否有其他实例共用同一 xapp- 令牌`)
+            }
+          }
+        } else if (envelope.type === 'disconnect') {
+          if (envelope.reason === 'link_disabled' && !stopped && !fatal) {
+            log('Slack 下发 disconnect（link_disabled）：App 的 Socket Mode 可能已被关闭或应用已卸载，请检查 Slack App 设置')
+          }
+        } else if (envelope.type === 'events_api') {
+          const payload = isPlainObject(envelope.payload) ? envelope.payload : undefined
+          const innerEvent = payload !== undefined && isPlainObject(payload.event) ? payload.event : undefined
+          const eventType = typeof innerEvent?.type === 'string' ? innerEvent.type.trim() : ''
+          if (eventType === '') {
+            if (!stopped && !fatal) {
+              if (payload?.type === 'app_rate_limited') {
+                log('Slack Events API 触发应用限流（app_rate_limited），已确认该控制通知')
+              } else {
+                log('收到缺少 event.type 的 Slack Events API 控制包，已忽略并确认')
+              }
+              const envelopeId = typeof envelope.envelope_id === 'string' ? envelope.envelope_id.trim() : ''
+              const sendFn: unknown = Reflect.get(client as object, 'send')
+              if (envelopeId !== '' && typeof sendFn === 'function') {
+                void Promise.resolve()
+                  .then(() => (sendFn as (id: string, body?: unknown) => Promise<unknown>).call(client, envelopeId))
+                  .catch(error => log('Socket Mode 控制包确认失败', error))
+              }
+            }
+            return
+          }
+        }
+      }
+    }
+    for (const listener of originalWsListeners) {
+      try {
+        const result = listener.call(client, data, isBinary)
+        if (result !== null && typeof result === 'object' && typeof (result as PromiseLike<unknown>).then === 'function') {
+          void Promise.resolve(result).catch(error => log('处理 Socket Mode 消息帧失败', error))
+        }
+      } catch (error) {
+        log('处理 Socket Mode 消息帧失败', error)
+      }
+    }
+  })
 
   const closeDispatcher = () => {
     if (dispatcher === undefined || dispatcherClosed) return
@@ -154,7 +277,8 @@ export function startSocketModeClient(
   const failure = (error: unknown) => {
     const code = errorCode(error)
     fatal = AUTH_ERRORS.has(code)
-    status = { ...status, state: fatal ? 'auth_failed' : 'reconnecting', error: code }
+    activeConnections = undefined
+    status = { state: fatal ? 'auth_failed' : 'reconnecting', attempts: status.attempts, error: code }
     failures++
     needsRetry = !fatal
     log(fatal ? 'Socket Mode 令牌或权限无效，已停止重连；更新 App-Level Token 后重启插件' : 'Socket Mode 连接失败，将退避重试', error)
@@ -167,10 +291,11 @@ export function startSocketModeClient(
     if (stopped || fatal || connecting) return
     connecting = true
     needsRetry = false
+    activeConnections = undefined
     attemptController?.abort()
     const controller = new AbortController()
     attemptController = controller
-    status = { ...status, state: status.attempts === 0 ? 'connecting' : 'reconnecting', attempts: status.attempts + 1 }
+    status = { state: status.attempts === 0 ? 'connecting' : 'reconnecting', attempts: status.attempts + 1 }
     void Promise.resolve().then(() => {
       if (!stopped && !fatal) return client.start()
     }).then(() => {
@@ -187,7 +312,11 @@ export function startSocketModeClient(
     if (stopped || fatal) { disconnect(); return }
     failures = 0
     needsRetry = false
-    status = { state: 'connected', attempts: status.attempts }
+    status = {
+      state: 'connected',
+      attempts: status.attempts,
+      ...(activeConnections !== undefined && activeConnections > 1 ? { activeConnections } : {}),
+    }
     if (typeof options.onConnected === 'function') {
       try {
         options.onConnected()
@@ -198,8 +327,9 @@ export function startSocketModeClient(
   })
   client.on('disconnected', () => {
     if (stopped || fatal) return
+    activeConnections = undefined
     needsRetry = true
-    status = { ...status, state: 'reconnecting' }
+    status = { state: 'reconnecting', attempts: status.attempts }
     schedule()
   })
   client.on('error', error => {
@@ -226,10 +356,11 @@ export function startSocketModeClient(
   return Object.assign(() => {
     if (stopped) return
     stopped = true
+    activeConnections = undefined
     attemptController?.abort()
     if (retry !== undefined) clearTimeout(retry)
     retry = undefined
-    status = { ...status, state: 'stopped' }
+    status = { state: 'stopped', attempts: status.attempts, ...(status.error !== undefined ? { error: status.error } : {}) }
     disconnect(closeDispatcher)
   }, { status: () => ({ ...status }) })
 }

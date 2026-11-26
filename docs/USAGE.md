@@ -6,7 +6,14 @@
 
 ### 第 1 步：创建 Slack App 并获取令牌
 
-**基础权限（单向通知、线程回复与频道列表，2 分钟配好）：**
+**方式一（推荐，30 秒一键导入 Manifest）：**
+1. 打开 <https://api.slack.com/apps> → **Create New App** → **From a manifest**，选择你的工作区。
+2. 切换到 **YAML** 标签页，直接粘贴仓库根目录的 [`slack-app-manifest.yaml`](../slack-app-manifest.yaml) → **Next** → **Create**。
+   - 该清单已按线上最小必需原则预配全部 Bot Token Scopes（含容易遗漏的 `app_mentions:read`）、Socket Mode 开关、5 类收件箱事件，以及 `app_home.messages_tab_read_only_enabled: false`（确保用户可在 Messages 标签页直接给机器人发私信）。
+3. 左侧 **Install App** → **Install to Workspace** 完成授权，复制 `xoxb-`（或可轮换 `xoxe.xoxb-`）开头的 **Bot User OAuth Token**。
+4. 如需开启双向 Socket Mode 收件箱（`slack_inbox`）：左侧 **Basic Information → App-Level Tokens → Generate Token and Scopes**，勾选 `connections:write`，复制 `xapp-` 开头的 **App-Level Token**。
+
+**方式二（手动逐项勾选权限）：**
 1. 打开 <https://api.slack.com/apps> → **Create New App** → **From scratch**，选择工作区。
 2. 打开左侧 **OAuth & Permissions**，在 **Bot Token Scopes** 下按需添加权限：
    - **必选基础**：
@@ -14,20 +21,15 @@
      - `channels:read`（列出公开频道与 `#频道名` 自动解析）
    - **按需扩展（对应新工具与增强能力）**：
      - `groups:read`（列出私密频道；未授予时 `slack_channels` 会自动降级只查公开频道）
-     - `channels:history` / `groups:history` / `im:history` / `mpim:history`（`slack_history` 与 `slack_thread` 读取频道历史和线程上下文）
+     - `channels:history` / `groups:history` / `im:history` / `mpim:history`（`slack_history`、`slack_thread` 以及对应的 `message.*` 事件订阅）
+     - `im:read` / `mpim:read`（私信与多人私信会话元数据）
+     - `app_mentions:read`（订阅 `app_mention` 事件必需，缺失会被 Slack 拒绝）
      - `files:write`（`slack_upload` 上传文本或本地文件）
      - `reactions:write`（`slack_react` 添加表情回应）
      - `users:read`（可选：读取历史/线程时自动把 `U...` 解析为显示昵称，未授予时静默回退用户 ID）
-3. 点击顶部 **Install to Workspace** 完成授权，复制 `xoxb-`（或旋转令牌 `xoxe.xoxb-`）开头的 **Bot User OAuth Token**。
-
-**可选：开启双向 Socket Mode 收件箱（`slack_inbox`）：**
-1. 在同一个 App 左侧打开 **Socket Mode** → 开启 **Enable Socket Mode**，生成带 `connections:write` 权限的 **App-Level Token**（`xapp-` 开头）。
-2. 打开 **Event Subscriptions** → 开启开关，在 **Subscribe to bot events** 按需订阅：
-   - `message.channels`（公开频道消息）
-   - `message.groups`（私密频道消息）
-   - `message.im`（私信）
-   - `message.mpim`（多人私信）
-   - `app_mention`（频道内 `@机器人` 提及；与 `message.*` 同时订阅时会自动按 `(channel, ts)` 去重）
+3. 若允许用户私信机器人，在 **App Home** 勾选 **Messages Tab** 并开启 **Allow users to send Slash commands and messages from the messages tab**（对应 Manifest 的 `messages_tab_read_only_enabled: false`）。
+4. 点击顶部 **Install to Workspace** 完成授权，复制 `xoxb-` 开头的 **Bot User OAuth Token**。
+5. 如需收件箱，再开启 **Socket Mode**（生成带 `connections:write` 的 `xapp-` 令牌），并在 **Event Subscriptions → Subscribe to bot events** 订阅 `message.channels`、`message.groups`、`message.im`、`message.mpim`、`app_mention`（同时订阅 `app_mention` 与 `message.*` 时会自动按 `(channel, ts)` 去重）。
 
 ### 第 2 步：在 DSH 中填写配置（两种方式任选）
 
@@ -113,10 +115,10 @@ $env:DSH_SLACK_APP_TOKEN = "xapp-你的App级令牌"
 | `slack_channels` | 列出机器人可见频道 | `scope` 可选：`joined`（默认，调 `users.conversations` 只列已加入频道）或 `all`（调 `conversations.list` 列工作区可见频道）；自动排除已归档频道、展示公开/私密标签并在缺 `groups:read` 时自动降级查公开频道。权限：`channels:read`（可选 `groups:read`） |
 | `slack_inbox` | 读取 Socket Mode 内存收件箱 | `limit`（1–50，默认 10）、`markRead`（原子消费返回消息并返回 `remaining`）；保留 `thread_ts`、`event_type`（`app_mention`）与 `files` 附件摘要，支持 `thread_broadcast` / `file_share`、自动去重与过滤机器人自身消息。需 `appToken` + 事件订阅 |
 | `slack_health` | 凭据、配置与连接自检 | `verify` 可选（默认 `false` 不发网络请求；`true` 时调用 `auth.test` 返回工作区、机器人身份与已授予权限）；自动检查 `token`/`appToken` 前缀与 `slackApiUrl` 合法性 |
-| `slack_history` | 读取频道历史消息 | `channel` 必填（支持 `#频道名` 自动解析），`limit`（1–100，默认 20），可选 `oldest` / `latest` 时间戳。权限：`channels:history`（私密频道需 `groups:history`，昵称解析可选 `users:read`） |
+| `slack_history` | 读取频道历史消息 | `channel` 必填（支持 `#频道名`、`channel:ID` 与 `<#ID|name>` 自动解析），`limit`（1–100，默认 20），可选 `oldest` / `latest`（支持 Slack `ts` 或 ISO-8601 时间如 `2026-11-26T00:00:00Z`）；正文为空的 Block Kit / 告警附件消息自动提取可读文本。权限：`channels:history`（私密频道需 `groups:history`，昵称解析可选 `users:read`） |
 | `slack_thread` | 读取完整线程上下文 | `channel`、`thread_ts` 必填，`limit`（1–100，默认 50）；返回父消息与所有回复。权限：同 `slack_history` |
 | `slack_upload` | 上传文本或本地文件到频道/线程 | `filename` 必填，`content` 与 `file_path` 二选一，`channel` 可选（留空回退 `defaultChannel`），可选 `title`、`initial_comment`、`thread_ts`；内部自动解析频道 ID 并走官方 `filesUploadV2`。权限：`files:write` |
-| `slack_react` | 为消息添加表情回应 | `channel`、`timestamp`、`name`（如 `thumbsup` / `:white_check_mark:`）必填。权限：`reactions:write` |
+| `slack_react` | 为消息添加表情回应 | `channel`、`timestamp`、`name`（支持 `thumbsup` / `:white_check_mark:` 或常见 Unicode 表情如 `👍` / `✅` 自动转短码）必填。权限：`reactions:write` |
 
 ---
 

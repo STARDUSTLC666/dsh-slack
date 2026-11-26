@@ -3,6 +3,8 @@
  * 队列容量 200，满则丢最旧；解析为纯函数，便于注入 fake 事件测试。
  */
 
+import { extractFallbackMessageText } from './message-text.js'
+
 /** 收件箱消息中的文件附件摘要。 */
 export interface InboxFileSummary {
   name?: string
@@ -170,7 +172,10 @@ export function parseMessageEvent(raw: unknown, botUserId?: string): InboxMessag
   const rawText = typeof event.text === 'string' ? event.text : ''
   let text = rawText
   if (rawText.trim() === '') {
-    if (subtype === 'file_share' || files !== undefined) {
+    const structuredFallback = extractFallbackMessageText(event.blocks, event.attachments)
+    if (structuredFallback !== '') {
+      text = structuredFallback
+    } else if (subtype === 'file_share' || files !== undefined) {
       text = fallbackFileText(files)
     } else {
       return null

@@ -9,15 +9,23 @@ export interface SocketStatus {
     state: 'connecting' | 'connected' | 'reconnecting' | 'auth_failed' | 'stopped';
     attempts: number;
     error?: string;
+    /** 当 Slack hello 帧回报 >1 个并发连接时记录，提示事件可能被多实例分流。 */
+    activeConnections?: number;
 }
 export interface SocketClientLike {
     on(event: string, listener: (...args: unknown[]) => void): unknown;
     start(): Promise<unknown>;
     disconnect(): Promise<unknown>;
+    listeners?(event: string): Array<(...args: unknown[]) => unknown>;
+    off?(event: string, listener: (...args: unknown[]) => void): unknown;
+    removeListener?(event: string, listener: (...args: unknown[]) => void): unknown;
+    send?(envelopeId: string, body?: unknown): Promise<unknown>;
 }
 export interface SocketLifecycleOptions {
     retryBaseMs?: number;
     jitter?: boolean;
+    /** WebSocket 客户端 pong 超时（毫秒）；默认 15,000ms，避免公网/代理抖动触发 SDK 默认 5s 误断连。 */
+    clientPingTimeoutMs?: number;
     slackApiUrl?: string;
     botUserId?: string;
     botUserIdProvider?: () => string | undefined;

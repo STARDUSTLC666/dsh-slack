@@ -127,6 +127,11 @@ export declare function createWebSlackClient(token: string, slackApiUrl?: string
  * 把 Slack API 错误映射为全中文提示（本地校验/文件/分页等已知中文错误直接透传，不加冗余前缀）。
  */
 export declare function mapSlackError(error: unknown): string;
+/**
+ * 规整频道输入：提取 Slack 频道提及（如 <#C01234567|general>）与 channel: 前缀中的规范频道 ID，
+ * 其他频道名（如 #general）或规范 ID 原样去首尾空白返回。
+ */
+export declare function normalizeChannelInput(channel: string): string;
 /** 校验 channel 参数：必须是非空字符串（频道名或频道 ID）。 */
 export declare function assertChannel(channel: unknown): string;
 /** 校验 text 参数：必须是非空字符串。 */
@@ -135,5 +140,13 @@ export declare function assertText(text: unknown): string;
 export declare function assertThreadTs(thread_ts: unknown): string;
 /** 校验消息时间戳（ts / timestamp）参数：必须是非空字符串。 */
 export declare function assertTimestamp(timestamp: unknown, fieldName?: string): string;
-/** 校验并规整 Slack 表情回应名称（自动去除两侧冒号）。 */
+/**
+ * 规整历史查询边界时间戳（oldest / latest）：
+ * - 直接透传标准 Slack 数字时间戳（如 1700000000.000100 或 1700000000）；
+ * - 自动将 ISO-8601 日期/时间（如 2026-11-26T00:00:00Z、2026-11-26T08:00:00+08:00、
+ *   2026-11-26T00:00:00.000100Z 或 2026-11-26）转为 Unix 秒时间戳，保留 Slack 6 位微秒精度；
+ * - 其他非法格式抛出清晰中文错误，避免把不可解析文本发给 Slack 触发 invalid_ts_oldest/latest。
+ */
+export declare function normalizeHistoryTimestamp(value: unknown, fieldName?: string): string;
+/** 校验并规整 Slack 表情回应名称（自动去除两侧冒号，并将常见 Unicode 表情转换为 Slack 短码）。 */
 export declare function assertReactionName(name: unknown): string;

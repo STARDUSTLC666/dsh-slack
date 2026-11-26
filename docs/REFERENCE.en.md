@@ -16,12 +16,12 @@ Feedback and contributions are welcome: report [issues](https://github.com/STARD
 
 ## What it does
 
-- Send native Markdown notifications to channels or threads (`slack_notify` / `slack_reply`), with automatic plain-text fallback over 12,000 characters.
+- Send native Markdown notifications to channels or threads (`slack_notify` / `slack_reply`), with automatic plain-text fallback over 12,000 characters and ID-resolution fallback when posting by private channel `#name`.
 - List joined or workspace-visible channels (`slack_channels`), excluding archived channels and gracefully falling back to public channels if `groups:read` is absent.
-- Read channel message history and full thread discussions (`slack_history` / `slack_thread`) with `#channel` resolution and best-effort user display names.
-- Upload text snippets or local files (`slack_upload` via `filesUploadV2`) and add emoji reactions (`slack_react`).
-- Receive public/private channel messages, DMs, `@mentions`, thread broadcasts, and file shares via Socket Mode (`slack_inbox`), with deduplication and automatic bot self-filtering.
-- Run offline configuration checks or live `auth.test` token & scope verification (`slack_health`).
+- Read channel message history and full thread discussions (`slack_history` / `slack_thread`) with `#channel` / `<#ID|name>` / `channel:ID` resolution, ISO-8601 time boundaries, Block Kit / attachment fallback extraction, and best-effort user/bot display names.
+- Upload text snippets or local files (`slack_upload` via `filesUploadV2`) and add emoji reactions (`slack_react`, automatically translating common Unicode glyphs to Slack shortcodes).
+- Receive public/private channel messages, DMs, `@mentions`, thread broadcasts, file shares, and Block Kit messages via Socket Mode (`slack_inbox`), with deduplication and automatic bot self-filtering.
+- Run offline configuration checks or live `auth.test` token & scope verification (`slack_health`), including multi-connection Socket Mode hints.
 
 ## Install
 
@@ -35,7 +35,7 @@ For the web version, replace `desktop` with `web`. Restart DSH after installatio
 
 ## Start using it
 
-1. Configure the needed OAuth scopes and optional Socket Mode for your Slack App, and obtain Bot (`xoxb-`) and optional App-Level (`xapp-`) tokens.
+1. Visit <https://api.slack.com/apps> → **Create New App → From a manifest**, paste [`slack-app-manifest.yaml`](../slack-app-manifest.yaml) to create a preconfigured Slack App in one click, install it, and copy the Bot (`xoxb-`) and optional App-Level (`xapp-` with `connections:write`) tokens.
 2. Enter the tokens in DSH Slack settings and run `slack_health` (optionally with `verify=true`) to check credentials, scopes, and connection state.
 3. Verify messaging, history lookup, or incoming inbox events in a test channel before automating team workflows.
 4. Review the target channel, thread, and message content before sending. Check Slack before retrying after any network timeout.

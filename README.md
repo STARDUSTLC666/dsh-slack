@@ -40,7 +40,7 @@ dsh plugin --profile desktop add dsh-slack
 <a id="开始使用"></a>
 ## 最快 3 步用起来
 
-1. **创建 Slack App 拿令牌**：在 <https://api.slack.com/apps> 勾选基础权限 `chat:write`、`channels:read`（按需补勾 `groups:read`、`channels:history`、`files:write`、`reactions:write`、`users:read`）并安装到工作区，复制 `xoxb-` 令牌（需收件箱时再开 Socket Mode 获取 `xapp-`）。
+1. **一键创建 Slack App 拿令牌**：打开 <https://api.slack.com/apps> → **Create New App** → **From a manifest**，直接粘贴本仓库根目录的 [`slack-app-manifest.yaml`](https://github.com/STARDUSTLC666/dsh-slack/blob/main/slack-app-manifest.yaml)（已预配全量 Bot Scopes、Socket Mode、私信可写与事件订阅），安装到工作区并复制 `xoxb-` 令牌（需收件箱时在 **Basic Information → App-Level Tokens** 生成带 `connections:write` 的 `xapp-` 令牌）。手动配置见[使用说明](https://github.com/STARDUSTLC666/dsh-slack/blob/main/docs/USAGE.md#第-1-步创建-slack-app-并获取令牌)。
 2. **填入原生设置**：打开 DSH「**设置 → 插件 → Slack（dsh-slack）**」填入 `token` 与 `defaultChannel`（令牌自动脱敏，发信配置保存即生效）。
 3. **拉机器人进频道并自检**：在目标频道输入 `/invite @你的机器人`，回到 DSH 对话先跑一次连接自检（可加在线鉴权），即可开始发信、读历史、传文件或收件。
 
@@ -63,7 +63,7 @@ dsh plugin --profile desktop add dsh-slack
 | :--- | :--- | :--- |
 | `token 未配置` 或前缀报错 | 未填 `xoxb-` / `xoxp-` 令牌，或误把 `xapp-` 填到 `token` 栏 | 在「设置 → 插件 → Slack」把 `xoxb-` 填入 `token`、`xapp-` 填入 `appToken`（`token` 保存即生效） |
 | `not_in_channel` / `channel_not_found` | 机器人未加入目标频道，或私密/重名频道需用 ID | 在频道内运行 `/invite @你的机器人`，再让助手运行 `slack_channels` 获取准确 ID |
-| `slack_inbox` 一直为空 | 未配 `xapp-` 令牌、未开 Socket Mode 或漏订事件 | 开启 Socket Mode 并订阅 `message.channels` / `message.groups` / `message.im` / `message.mpim` / `app_mention`，填好 `appToken` 后重载 |
+| `slack_inbox` 一直为空 | 未配 `xapp-` 令牌、未开 Socket Mode、漏订事件或漏配 `app_mentions:read` | 推荐直接导入 `slack-app-manifest.yaml`；手动配置需开启 Socket Mode、订阅 `message.*` / `app_mention` 并补齐对应 `*:history` / `app_mentions:read` 权限，填好 `appToken` 后重载 |
 | `invalid_auth` / `missing_scope` | 令牌失效或缺少所需权限（报错会直接列出缺失 scope） | 在 Slack 后台补勾报错提示的权限并 Reinstall to Workspace，然后更新 `token`，用 `slack_health(verify=true)` 复核 |
 
 ## 插件更新

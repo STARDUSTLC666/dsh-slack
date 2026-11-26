@@ -1,5 +1,13 @@
 # 更新记录
 
+## 0.6.1 (2026-11-26)
+
+- **一键 Slack App Manifest**：新增 `slack-app-manifest.yaml` 并纳入 npm 导出与打包清单，一次性预配全部 9 个工具所需 Bot Scopes、Socket Mode 事件订阅及私信双向交互（`messages_tab_read_only_enabled: false`），同步更新中英文 README、使用说明与详细参考文档。
+- **生产环境 Slack API 与消息格式对齐**：新增 `extractFallbackMessageText`，自动提取 Block Kit 与彩色卡片（attachments）正文并在历史消息中支持 `bot_profile.name` 回退；增强 `<#C...|name>` 频道提及与 `#私密频道` 自动解析；`slack_history` 的 `oldest` / `latest` 支持保留微秒精度的 ISO-8601 时间戳自动转换；`slack_react` 内置约 92 个高频 Unicode 表情到 Slack shortcode 映射并妥善处理肤色修饰符。
+- **传输层与 Socket Mode 生产稳定性优化**：规避 Undici #5645 空 POST 请求体问题，在 `undici@8` 与双版本 undici 环境下为 Socket Mode 代理分发器固定 `allowH2: false`；优化 Socket Mode 15 秒 ping 超时配置、补充 `link_disabled` 告警提示并跟踪 `activeConnections`。
+- Add one-click `slack-app-manifest.yaml` (pre-configured with all 9 tools' Bot Scopes, Socket Mode event subscriptions, and `messages_tab_read_only_enabled: false` for DMs), exported and packaged alongside updated bilingual README/USAGE/REFERENCE docs.
+- Align production Slack API & Socket Mode behavior: Block Kit and attachment fallback text extraction (`extractFallbackMessageText`) plus `bot_profile.name` fallback, `<#C...|name>` channel mention and `#private-channel` auto-resolution, microsecond-preserving ISO-8601 `oldest`/`latest` history timestamps, ~92 high-frequency Unicode emoji to Slack shortcode mappings with skin-tone safety, Undici #5645 empty POST body stripping, `undici@8` `allowH2: false` / dual-undici Socket Mode proxy dispatcher, and Socket Mode 15s ping timeout, `link_disabled` warnings, and `activeConnections` tracking.
+
 ## 0.6.0 (2026-11-26)
 
 - **传输层与代理加固**：新增共享传输模块，按需支持 `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY`（无代理不接管默认直连，修复空字符串小写环境变量遮蔽），自动转换 `FormData` 保证二进制文件在代理下无损上传；遇到非法或不支持协议（如 `socks5h://`）的代理环境变量时平滑降级告警而不阻断插件加载，且日志不泄露凭据。
