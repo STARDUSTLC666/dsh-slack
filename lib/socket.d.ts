@@ -17,6 +17,11 @@ export interface SocketClientLike {
 }
 export interface SocketLifecycleOptions {
     retryBaseMs?: number;
+    jitter?: boolean;
+    slackApiUrl?: string;
+    botUserId?: string;
+    botUserIdProvider?: () => string | undefined;
+    onConnected?: () => void;
     createClient?: (options: ConstructorParameters<typeof SocketModeClient>[0]) => SocketClientLike;
 }
 export type SocketDisposer = (() => void) & {

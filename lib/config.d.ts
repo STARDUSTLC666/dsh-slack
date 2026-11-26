@@ -33,6 +33,20 @@ export declare function resolveAppToken(config: SlackConfig | undefined): string
  * 解析默认频道。
  */
 export declare function resolveDefaultChannel(config: SlackConfig | undefined): string;
+/** 令牌格式校验结果。 */
+export interface TokenValidationResult {
+    valid: boolean;
+    kind: 'bot' | 'user' | 'app' | 'unknown';
+    reason?: string;
+}
+/**
+ * 校验自定义 Slack Web API 基地址是否为合法的 http/https URL。
+ */
+export declare function isValidSlackApiUrl(url: string): boolean;
+/**
+ * 校验 Slack Web API 令牌前缀格式（区分 Bot / User / 误填的 App-Level Token / 未知格式）。
+ */
+export declare function validateTokenFormat(token: string): TokenValidationResult;
 /**
  * 要求 token：缺失时抛出带中文指引的错误（供 execute 使用）。
  */

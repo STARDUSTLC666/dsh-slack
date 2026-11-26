@@ -39,7 +39,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: git diff --exit-code -- lib
-      - run: if [ -f lib/client.js ]; then node --check lib/client.js; fi
+      - run: if [ -f lib/update-client.js ]; then node --check lib/update-client.js; fi
       - run: node .github/scripts/npm-release.mjs pack
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

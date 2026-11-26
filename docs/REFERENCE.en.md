@@ -6,7 +6,7 @@
 
 ![dsh-slack whale girl plugin cover](https://raw.githubusercontent.com/STARDUSTLC666/dsh-slack/main/assets/cover-whale-girl.png)
 
-Connect Slack to DSH for task notifications, a Socket Mode inbox and thread replies. Includes account health checks and controlled reconnection, stopping retries with a clear status when authentication fails.
+Connect Slack to DSH for native Markdown task notifications, channel & thread history reading, file uploads, emoji reactions, a Socket Mode inbox, and thread replies. Includes offline & online (`auth.test`) health checks, proxy-aware transport, and controlled backoff reconnection that stops on permanent auth failures.
 
 [![npm](https://img.shields.io/npm/v/dsh-slack)](https://www.npmjs.com/package/dsh-slack) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-downloads.svg)](https://www.npmjs.com/package/dsh-slack) [![total downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-total-downloads.svg)](https://www.npmjs.com/package/dsh-slack)
 
@@ -16,9 +16,12 @@ Feedback and contributions are welcome: report [issues](https://github.com/STARD
 
 ## What it does
 
-- Send Markdown notifications to channels or threads.
-- List visible channels and read the Socket Mode inbox.
-- Reply in threads and check connection or token configuration.
+- Send native Markdown notifications to channels or threads (`slack_notify` / `slack_reply`), with automatic plain-text fallback over 12,000 characters.
+- List joined or workspace-visible channels (`slack_channels`), excluding archived channels and gracefully falling back to public channels if `groups:read` is absent.
+- Read channel message history and full thread discussions (`slack_history` / `slack_thread`) with `#channel` resolution and best-effort user display names.
+- Upload text snippets or local files (`slack_upload` via `filesUploadV2`) and add emoji reactions (`slack_react`).
+- Receive public/private channel messages, DMs, `@mentions`, thread broadcasts, and file shares via Socket Mode (`slack_inbox`), with deduplication and automatic bot self-filtering.
+- Run offline configuration checks or live `auth.test` token & scope verification (`slack_health`).
 
 ## Install
 
@@ -32,16 +35,16 @@ For the web version, replace `desktop` with `web`. Restart DSH after installatio
 
 ## Start using it
 
-1. Configure permissions and Socket Mode for your Slack App, and obtain Bot and App-level tokens.
-2. Enter the tokens in DSH Slack settings and check the connection state.
-3. Verify incoming messages in your own test channel before asking for summaries or thread replies.
-4. Verify the channel, thread and text before sending. Check Slack for the result and inspect connection state before retrying.
+1. Configure the needed OAuth scopes and optional Socket Mode for your Slack App, and obtain Bot (`xoxb-`) and optional App-Level (`xapp-`) tokens.
+2. Enter the tokens in DSH Slack settings and run `slack_health` (optionally with `verify=true`) to check credentials, scopes, and connection state.
+3. Verify messaging, history lookup, or incoming inbox events in a test channel before automating team workflows.
+4. Review the target channel, thread, and message content before sending. Check Slack before retrying after any network timeout.
 
 ## Requirements and configuration
 
-Requires a bot token. Socket Mode also needs an app token and permissions; the inbox is stored in memory.
+Requires a Bot Token (`xoxb-` / `xoxe.xoxb-`) or User Token (`xoxp-` / `xoxe.xoxp-`). Socket Mode inbox also needs an `xapp-` App-Level Token and event subscriptions; the inbox keeps up to 200 messages in memory.
 
-Detailed configuration, tool arguments and troubleshooting are in the [usage guide](USAGE.en.md). For standalone development, follow the Node requirement in [package.json](../package.json).
+Detailed configuration, all 9 tool parameters, required Slack scopes, and troubleshooting are in the [usage guide](USAGE.en.md). For standalone development, follow the Node requirement in [package.json](../package.json).
 
 ## Documentation
 

@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Slack",
-    "description": "Slack 频道通知、线程回复与可选 Socket Mode 双向消息收件箱，支持连接诊断与受控重连。"
+    "description": "Slack 原生 Markdown 通知、线程回复、频道历史与线程读取、文件上传、表情回应及可选 Socket Mode 双向收件箱，支持在线自检与受控重连。"
   }
 }

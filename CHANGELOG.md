@@ -1,5 +1,14 @@
 # 更新记录
 
+## 0.6.0 (2026-11-26)
+
+- **传输层与代理加固**：新增共享传输模块，按需支持 `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY`（无代理不接管默认直连，修复空字符串小写环境变量遮蔽），自动转换 `FormData` 保证二进制文件在代理下无损上传；遇到非法或不支持协议（如 `socks5h://`）的代理环境变量时平滑降级告警而不阻断插件加载，且日志不泄露凭据。
+- **消息、频道与错误处理升级**：`slack_notify` / `slack_reply` 默认以 Slack 原生 Markdown Block 发送（超 12,000 字、代理/代理对边界及 `invalid_blocks` 自动安全降级纯文本），返回规范化频道 ID 并严格校验 `thread_ts`；`slack_channels` 默认调用 `users.conversations` 排除归档频道、支持 `scope="all"` 及 `channels:read` / `groups:read` 双向缺权降级；重构 `mapSlackError` 覆盖限流秒数、HTTP 429/5xx、网络超时提醒、精确缺失 Scope 与本地校验错误去重前缀。
+- **Socket Mode 与收件箱增强**：卸载时即时中止在途 `apps.connections.open` 消除僵尸连接，非法 `slackApiUrl` 严格拒绝启动避免凭据误发公共 Slack，补齐静默 SDK 日志、重连抖动、单实例代理分发器清理以及离线恢复与 `.volatile()` 令牌热更新自动刷新机器人 `user_id`；`slack_inbox` 保留 `thread_ts`、`app_mention`、`file_share`（含无正文文件占位）与 `thread_broadcast`，按 `(channel, ts)` 规范去重并原位升级元数据，并遵守 `exec.signal` 取消信号。
+- **新增 4 个交互工具与在线自检**：新增 `slack_history`（频道历史与用户名补全）、`slack_thread`（完整线程上下文）、`slack_upload`（基于 `filesUploadV2` 上传文本或本地文件）与 `slack_react`（表情回应）；`slack_health` 新增 `verify=true` 在线 `auth.test` 权限核验，校验 `token` 前缀（防误填 `xapp-`、兼容 `xoxe.*`）、`slackApiUrl` 与代理环境变量；同步更新双语文档、本地化文案与 CI/发布工作流。
+- Harden Slack transport, Socket Mode, inbox, and error handling (`HTTP(S)_PROXY` with binary-safe `FormData` conversion, non-crashing invalid proxy handling, fail-closed invalid `slackApiUrl`, in-flight `apps.connections.open` abort on dispose, silent SDK logger, backoff jitter, `botUserId` recovery & `.volatile()` hot-refresh, native Markdown blocks with >12k/`invalid_blocks` fallback, bidirectional `listChannels` scope fallback, canonical `(channel, ts)` inbox deduplication with `thread_ts`/`app_mention`/`file_share`/`thread_broadcast`, and comprehensive Chinese error mapping).
+- Add four new tools (`slack_history`, `slack_thread`, `slack_upload`, `slack_react`) plus online `auth.test` verification (`slack_health({ verify: true })`), token prefix & proxy env checks, all-9-tool argument/render safety, updated bilingual docs, and CI/publish workflow fixes.
+
 ## 0.5.8 (2026-11-23)
 
 - 修复 `slack_notify` 省略或留空 `channel` 时未回退实时 `defaultChannel` 的问题，确保在原生设置面板热更新默认频道后立即生效。

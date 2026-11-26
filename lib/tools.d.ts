@@ -9,10 +9,15 @@ export interface ToolDeps {
     configProvider: () => SlackConfig | undefined;
     inboxProvider: () => InboxQueue;
     socketStatusProvider?: () => SocketStatus | undefined;
+    onBotUserIdResolved?: (userId: string) => void;
 }
-/** 自检工具：检查 token / appToken / 默认频道配置，不发起网络请求。 */
+/** 自检工具：检查 token / appToken / 默认频道 / API 地址 / 代理环境配置与 Socket Mode 连接状态；可选 verify=true 在线验证。 */
 export declare function buildHealthTool(deps: ToolDeps): ToolDefinition;
 export declare function buildNotifyTool(deps: ToolDeps): ToolDefinition;
 export declare function buildChannelsTool(deps: ToolDeps): ToolDefinition;
 export declare function buildInboxTool(deps: ToolDeps): ToolDefinition;
 export declare function buildReplyTool(deps: ToolDeps): ToolDefinition;
+export declare function buildHistoryTool(deps: ToolDeps): ToolDefinition;
+export declare function buildThreadTool(deps: ToolDeps): ToolDefinition;
+export declare function buildUploadTool(deps: ToolDeps): ToolDefinition;
+export declare function buildReactTool(deps: ToolDeps): ToolDefinition;

@@ -2,9 +2,9 @@
 
 # Slack
 
-> **Bring task notifications, thread replies, and a two-way inbox straight into Slack.**
+> **Bring task notifications, thread collaboration, history lookup, file sharing, and a two-way inbox straight into Slack.**
 
-Slack integration plugin for DeepSeek Harness (`>=0.2.2-rc.3`), supporting channel alerts, thread replies, optional Socket Mode inbox reception, health diagnostics, and controlled backoff reconnects.
+Slack integration plugin for DeepSeek Harness (`>=0.2.2-rc.3`), supporting native Markdown channel alerts, thread replies, channel & thread history reading, file uploads, emoji reactions, optional Socket Mode inbox reception, offline/online health diagnostics, and controlled backoff reconnects.
 
 [![npm](https://img.shields.io/npm/v/dsh-slack)](https://www.npmjs.com/package/dsh-slack) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-downloads.svg)](https://www.npmjs.com/package/dsh-slack) [![total downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-slack-total-downloads.svg)](https://www.npmjs.com/package/dsh-slack)
 
@@ -22,10 +22,11 @@ Slack integration plugin for DeepSeek Harness (`>=0.2.2-rc.3`), supporting chann
 
 | Capability | What It Gives You |
 | :--- | :--- |
-| **Channels & Thread Replies** | Post formatted task updates to channels and keep follow-ups tidy inside threads |
-| **Optional Socket Mode Inbox** | Add an `xapp-` App-Level Token to receive channel/DM messages for AI triage and draft replies |
-| **Live Masked Settings** | Mask tokens in DSH Settings with instant hot reload for outgoing config (or `DSH_SLACK_TOKEN` / `DSH_SLACK_APP_TOKEN`) |
-| **Diagnostics & Backoff** | Built-in health checks, visible channel listing, and controlled backoff reconnects |
+| **Native Markdown Alerts & Thread Replies** | Post updates via `slack_notify` / `slack_reply` using Slack Markdown blocks (with automatic plain-text fallback over 12,000 chars) |
+| **Channel History & Thread Context** | Read recent channel messages (`slack_history`) and full thread discussions (`slack_thread`) with automatic `#channel` and user display-name resolution |
+| **File Uploads & Emoji Reactions** | Share logs, reports, or local files with `slack_upload` (`filesUploadV2`) and acknowledge messages with `slack_react` |
+| **Optional Socket Mode Inbox** | Add an `xapp-` App-Level Token to receive channel, private group, DM, `@mention`, thread, and file-share messages with automatic deduplication and self-message filtering |
+| **Live Masked Settings & Online Diagnostics** | Masked tokens with prefix validation and hot reload; `slack_health` supports both offline checks and `verify=true` (`auth.test`), plus `HTTP_PROXY`/`HTTPS_PROXY` support |
 
 ## Install
 
@@ -40,27 +41,31 @@ For the web profile, replace `desktop` with `web`. Restart DSH once after instal
 <a id="start-using-it"></a>
 ## Get Started in 3 Steps
 
-1. **Create a Slack App & grab tokens**: At <https://api.slack.com/apps>, grant `chat:write` and `channels:read`, install to your workspace, and copy the `xoxb-` Bot Token (enable Socket Mode + `xapp-` token for two-way inbox support).
+1. **Create a Slack App & grab tokens**: At <https://api.slack.com/apps>, grant core scopes `chat:write` and `channels:read` (plus optional `groups:read`, `channels:history`, `files:write`, `reactions:write`, `users:read` as needed), install to your workspace, and copy the `xoxb-` Bot Token (enable Socket Mode + `xapp-` token for two-way inbox support).
 2. **Save in DSH Settings**: Open **DSH Settings → Plugins → Slack (`dsh-slack`)** and enter `token` and `defaultChannel` (tokens are masked and outgoing settings apply live).
-3. **Invite the bot & verify**: Run `/invite @your-bot` inside your target Slack channel, then ask the assistant to check Slack health and list accessible channels.
+3. **Invite the bot & verify**: Run `/invite @your-bot` inside your target Slack channel, then ask the assistant to run an online health check (`slack_health` with `verify=true`) and list joined channels.
 
 ### Ready-to-copy prompts
 
-- **Check health and visible channels**
-  > Check my Slack connection status and list the channels (with channel IDs) the bot can currently access.
+- **Check health (with online scope verification) and joined channels**
+  > Run an online Slack health check to verify my token and scopes, and list the channels (with IDs) the bot has joined.
 - **Draft a channel update before posting**
   > Summarize our progress for `#engineering` and show me the draft first. Post to Slack only after I confirm.
+- **Read channel history and thread context**
+  > Fetch the latest 20 messages from `#engineering`, then pull the full thread discussing the release blocker and summarize it.
+- **Upload a report & add a reaction**
+  > Upload `report.md` to that thread in `#release` and react to the parent message with `white_check_mark`.
 - **Triage Socket Mode inbox & draft thread replies**
-  > Read the latest unread messages in the Slack inbox, summarize what needs action, and draft a thread reply for my review without sending yet.
+  > Read the latest unread messages in the Slack inbox (including `@mentions` and thread replies), summarize what needs action, and draft a thread reply for my review without sending yet.
 
 ## Quick Troubleshooting Checklist
 
 | Symptom | Likely Cause | Fix |
 | :--- | :--- | :--- |
-| `token 未配置` | Missing `xoxb-` / `xoxp-` token | Paste `token` in **DSH Settings → Plugins → Slack** (applies live) or set `DSH_SLACK_TOKEN` |
-| `not_in_channel` / `channel_not_found` | Bot has not joined the channel, or private channel needs its ID | Run `/invite @your-bot` in Slack, then ask the assistant to list visible channels |
-| `slack_inbox` stays empty | Missing `xapp-` token, Socket Mode off, or missing event subscriptions | Enable Socket Mode, subscribe to `message.channels` / `message.im`, set `appToken`, and reload |
-| `invalid_auth` / `missing_scope` | Token revoked or missing `chat:write` / `channels:read` | Add scopes, reinstall the App to your workspace, and update `token` |
+| `token 未配置` or invalid prefix | Missing `xoxb-` / `xoxp-` token, or `xapp-` pasted into `token` | Put `xoxb-` in `token` (applies live) and `xapp-` in `appToken` under **DSH Settings → Plugins → Slack** |
+| `not_in_channel` / `channel_not_found` | Bot has not joined the channel, or private channel needs its ID | Run `/invite @your-bot` in Slack, then run `slack_channels` to copy the exact channel ID |
+| `slack_inbox` stays empty | Missing `xapp-` token, Socket Mode off, or missing event subscriptions | Enable Socket Mode, subscribe to `message.channels` / `message.groups` / `message.im` / `message.mpim` / `app_mention`, set `appToken`, and reload |
+| `invalid_auth` / `missing_scope` | Token revoked or missing required scopes (error message names exact missing scope) | Add the listed scopes in Slack App settings, click **Reinstall to Workspace**, update `token`, and verify with `slack_health(verify=true)` |
 
 ## Plugin updates
 

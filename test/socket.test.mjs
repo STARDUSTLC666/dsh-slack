@@ -4,8 +4,8 @@ import { parseMessageEvent, createInboxQueue, INBOX_CAPACITY, buildInboxTool, bu
 
 const CFG = () => ({ token: 'xoxb-test', defaultChannel: '#general', appToken: '' })
 
-function msg(ts, text) {
-  return { ts, channel: 'C1', user: 'U1', text }
+function msg(ts, text, channel = 'C1') {
+  return { ts, channel, user: 'U1', text }
 }
 
 test('parseMessageEvent 解析普通 message 事件', () => {
@@ -13,14 +13,178 @@ test('parseMessageEvent 解析普通 message 事件', () => {
   assert.deepEqual(value, { ts: '1.2', channel: 'C1', user: 'U1', text: '你好' })
 })
 
-test('parseMessageEvent 排除 subtype 非空的消息', () => {
-  assert.equal(parseMessageEvent({ type: 'message', subtype: 'bot_message', ts: '1.2', channel: 'C1', user: 'U1', text: 'x' }), null)
-  assert.equal(parseMessageEvent({ type: 'message', subtype: 'channel_join', ts: '1.2', channel: 'C1', user: 'U1', text: 'x' }), null)
+test('parseMessageEvent 保留 thread_ts 并在空白或缺失时省略', () => {
+  const inThread = parseMessageEvent({
+    type: 'message',
+    ts: '2.3',
+    thread_ts: ' 1.2 ',
+    channel: 'C1',
+    user: 'U1',
+    text: '线程内回复',
+  })
+  assert.deepEqual(inThread, { ts: '2.3', thread_ts: '1.2', channel: 'C1', user: 'U1', text: '线程内回复' })
+
+  const blankThread = parseMessageEvent({
+    type: 'message',
+    ts: '2.4',
+    thread_ts: '   ',
+    channel: 'C1',
+    user: 'U1',
+    text: '普通消息',
+  })
+  assert.deepEqual(blankThread, { ts: '2.4', channel: 'C1', user: 'U1', text: '普通消息' })
+  assert.equal('thread_ts' in blankThread, false)
 })
 
-test('parseMessageEvent 排除 bot 自己发的消息（bot_id 或 botUserId）', () => {
+test('parseMessageEvent 支持 app_mention（直接事件、events_api 包与按类型包）', () => {
+  const direct = parseMessageEvent({
+    type: 'app_mention',
+    ts: '3.1',
+    thread_ts: '3.0',
+    channel: 'C1',
+    user: 'U1',
+    text: '<@UBOT> 帮我看下日志',
+  })
+  assert.deepEqual(direct, {
+    ts: '3.1',
+    thread_ts: '3.0',
+    channel: 'C1',
+    user: 'U1',
+    text: '<@UBOT> 帮我看下日志',
+    event_type: 'app_mention',
+  })
+
+  const envelope = parseMessageEvent({
+    type: 'events_api',
+    body: { event: { type: 'app_mention', ts: '3.2', channel: 'C2', user: 'U2', text: '<@UBOT> hi' } },
+  })
+  assert.deepEqual(envelope, {
+    ts: '3.2',
+    channel: 'C2',
+    user: 'U2',
+    text: '<@UBOT> hi',
+    event_type: 'app_mention',
+  })
+
+  const typed = parseMessageEvent({
+    event: { type: 'app_mention', ts: '3.3', channel: 'C2', user: 'U2', text: '<@UBOT> ping' },
+  })
+  assert.deepEqual(typed, {
+    ts: '3.3',
+    channel: 'C2',
+    user: 'U2',
+    text: '<@UBOT> ping',
+    event_type: 'app_mention',
+  })
+
+  assert.equal(parseMessageEvent({ type: 'app_mention', ts: '3.4', channel: 'C1', user: 'UBOT', text: 'self' }, 'UBOT'), null)
+})
+
+test('parseMessageEvent 允许 thread_broadcast 与 file_share，继续排除其他 subtype', () => {
+  const broadcast = parseMessageEvent({
+    type: 'message',
+    subtype: 'thread_broadcast',
+    ts: '4.2',
+    thread_ts: '4.0',
+    channel: 'C1',
+    user: 'U1',
+    text: '同步到频道的线程回复',
+  })
+  assert.deepEqual(broadcast, {
+    ts: '4.2',
+    thread_ts: '4.0',
+    channel: 'C1',
+    user: 'U1',
+    text: '同步到频道的线程回复',
+  })
+
+  assert.equal(parseMessageEvent({ type: 'message', subtype: 'bot_message', ts: '1.2', channel: 'C1', user: 'U1', text: 'x' }), null)
+  assert.equal(parseMessageEvent({ type: 'message', subtype: 'channel_join', ts: '1.2', channel: 'C1', user: 'U1', text: 'x' }), null)
+  assert.equal(parseMessageEvent({ type: 'message', subtype: 'message_changed', ts: '1.2', channel: 'C1', user: 'U1', text: 'x' }), null)
+  assert.equal(parseMessageEvent({ type: 'message', subtype: 'message_deleted', ts: '1.2', channel: 'C1', user: 'U1', text: 'x' }), null)
+})
+
+test('parseMessageEvent 处理 file_share 与附件：有说明保留原文本，无说明合成可读占位文本', () => {
+  const withCaption = parseMessageEvent({
+    type: 'message',
+    subtype: 'file_share',
+    ts: '5.1',
+    channel: 'C1',
+    user: 'U1',
+    text: '附上今日报告',
+    files: [{ name: 'report.pdf', mimetype: 'application/pdf', id: 'F1' }],
+  })
+  assert.deepEqual(withCaption, {
+    ts: '5.1',
+    channel: 'C1',
+    user: 'U1',
+    text: '附上今日报告',
+    files: [{ name: 'report.pdf', mimetype: 'application/pdf' }],
+  })
+
+  const withoutCaption = parseMessageEvent({
+    type: 'message',
+    subtype: 'file_share',
+    ts: '5.2',
+    channel: 'C1',
+    user: 'U1',
+    text: '',
+    files: [
+      { name: 'report.pdf', mimetype: 'application/pdf' },
+      { name: 'chart.png', mimetype: 'image/png' },
+    ],
+  })
+  assert.deepEqual(withoutCaption, {
+    ts: '5.2',
+    channel: 'C1',
+    user: 'U1',
+    text: '[文件: report.pdf, chart.png]',
+    files: [
+      { name: 'report.pdf', mimetype: 'application/pdf' },
+      { name: 'chart.png', mimetype: 'image/png' },
+    ],
+  })
+
+  const unnamedFile = parseMessageEvent({
+    type: 'message',
+    subtype: 'file_share',
+    ts: '5.3',
+    channel: 'C1',
+    user: 'U1',
+    files: [{ mimetype: 'image/png' }],
+  })
+  assert.deepEqual(unnamedFile, {
+    ts: '5.3',
+    channel: 'C1',
+    user: 'U1',
+    text: '[文件]',
+    files: [{ mimetype: 'image/png' }],
+  })
+
+  const plainWithFiles = parseMessageEvent({
+    type: 'message',
+    ts: '5.4',
+    channel: 'C1',
+    user: 'U1',
+    text: '',
+    files: [{ name: 'notes.txt' }],
+  })
+  assert.deepEqual(plainWithFiles, {
+    ts: '5.4',
+    channel: 'C1',
+    user: 'U1',
+    text: '[文件: notes.txt]',
+    files: [{ name: 'notes.txt' }],
+  })
+})
+
+test('parseMessageEvent 排除 bot 自己发的消息（bot_id 或非空 botUserId）', () => {
   assert.equal(parseMessageEvent({ type: 'message', ts: '1.2', channel: 'C1', user: 'U1', text: 'x', bot_id: 'B1' }), null)
   assert.equal(parseMessageEvent({ type: 'message', ts: '1.2', channel: 'C1', user: 'UBOT', text: 'x' }, 'UBOT'), null)
+  assert.deepEqual(
+    parseMessageEvent({ type: 'message', ts: '1.2', channel: 'C1', user: 'U1', text: 'x' }, ''),
+    { ts: '1.2', channel: 'C1', user: 'U1', text: 'x' },
+  )
 })
 
 test('parseMessageEvent 解析 slack_event 包（events_api → body.event）', () => {
@@ -28,7 +192,7 @@ test('parseMessageEvent 解析 slack_event 包（events_api → body.event）', 
   assert.deepEqual(parseMessageEvent(raw), { ts: '2.3', channel: 'C2', user: 'U2', text: 'hi' })
 })
 
-test('parseMessageEvent 排除非 message 类型与缺失字段', () => {
+test('parseMessageEvent 排除非 message/app_mention 类型与缺失字段', () => {
   assert.equal(parseMessageEvent({ type: 'hello' }), null)
   assert.equal(parseMessageEvent(null), null)
   assert.equal(parseMessageEvent({ type: 'message', ts: '1', channel: 'C', user: 'U', text: '' }), null)
@@ -54,13 +218,46 @@ test('InboxQueue clear 清空队列', () => {
   assert.deepEqual(q.list(10), [])
 })
 
-test('InboxQueue 忽略 Slack 重投的重复事件', () => {
+test('InboxQueue 按 (channel, ts) 去重：message 先到、app_mention 后到时升级保留 event_type 及缺失元数据，跨频道同 ts 保留', () => {
   const q = createInboxQueue()
-  q.push(msg('1.2', 'a'))
-  q.push(msg('1.2', 'a'))
-  q.push(msg('2.3', 'b'))
+  const asMessage = parseMessageEvent({ type: 'message', ts: '1.2', channel: 'C1', user: 'U1', text: '<@UBOT> hello' })
+  const asMention = parseMessageEvent({
+    type: 'app_mention',
+    ts: '1.2',
+    thread_ts: '1.0',
+    channel: 'C1',
+    user: 'U1',
+    text: '<@UBOT> hello',
+    files: [{ name: 'spec.md', mimetype: 'text/markdown' }],
+  })
+  q.push(asMessage)
+  q.push(asMention)
+  q.push(msg('1.2', 'other channel', 'C2'))
+  q.push(msg('2.3', 'b', 'C1'))
+  assert.equal(q.size, 3)
+  assert.deepEqual(
+    q.list(10).map((m) => `${m.channel}:${m.ts}`),
+    ['C1:2.3', 'C2:1.2', 'C1:1.2'],
+  )
+  const upgraded = q.list(10).find((m) => m.channel === 'C1' && m.ts === '1.2')
+  assert.equal(upgraded.event_type, 'app_mention')
+  assert.equal(upgraded.thread_ts, '1.0')
+  assert.deepEqual(upgraded.files, [{ name: 'spec.md', mimetype: 'text/markdown' }])
+  // 外部传入对象不会被队列原地污染
+  assert.equal(asMessage.event_type, undefined)
+})
+
+test('InboxQueue list/drain 遇到 NaN 或非有限数返回空数组且不清空队列', () => {
+  const q = createInboxQueue()
+  q.push(msg('1.0', 'a'))
+  q.push(msg('2.0', 'b'))
+  assert.deepEqual(q.list(Number.NaN), [])
+  assert.deepEqual(q.list(Number.POSITIVE_INFINITY), [])
+  assert.deepEqual(q.drain(Number.NaN), [])
+  assert.deepEqual(q.drain(Number.NEGATIVE_INFINITY), [])
+  assert.deepEqual(q.drain(-3), [])
   assert.equal(q.size, 2)
-  assert.deepEqual(q.list(10).map((m) => m.ts), ['2.3', '1.2'])
+  assert.deepEqual(q.list(10).map((m) => m.ts), ['2.0', '1.0'])
 })
 
 test('InboxQueue 分页标记已读不丢未返回的消息，重投已读消息不会重新入队', () => {

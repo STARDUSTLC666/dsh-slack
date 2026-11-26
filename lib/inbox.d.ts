@@ -1,13 +1,21 @@
 /**
- * Socket Mode 收件箱：把收到的 Slack message 事件解析进内存队列。
+ * Socket Mode 收件箱：把收到的 Slack message / app_mention 事件解析进内存队列。
  * 队列容量 200，满则丢最旧；解析为纯函数，便于注入 fake 事件测试。
  */
+/** 收件箱消息中的文件附件摘要。 */
+export interface InboxFileSummary {
+    name?: string;
+    mimetype?: string;
+}
 /** 收件箱中的一条消息。 */
 export interface InboxMessage {
     ts: string;
     channel: string;
     user: string;
     text: string;
+    thread_ts?: string;
+    event_type?: 'message' | 'app_mention';
+    files?: InboxFileSummary[];
 }
 /** 队列容量上限。 */
 export declare const INBOX_CAPACITY = 200;
@@ -22,7 +30,7 @@ export declare class InboxQueue {
     readonly capacity: number;
     constructor(capacity?: number);
     private key;
-    /** 追加一条消息；Slack 至少投递一次，重复事件直接忽略，超过容量时丢弃最旧。 */
+    /** 追加一条消息；按 Slack 规范标识 (channel, ts) 去重，重复到达时合并升级未读项元数据，超过容量时丢弃最旧。 */
     push(message: InboxMessage): void;
     /** 返回最近 limit 条消息（新的在前）。 */
     list(limit: number): InboxMessage[];
@@ -38,8 +46,10 @@ export declare class InboxQueue {
 }
 /**
  * 从 Socket Mode 事件里解析出一条消息；不满足条件返回 null。
- * - 兼容直接 message 事件、slack_event 包（{ type: 'events_api', body: { event } }）与
+ * - 支持 message 与 app_mention 事件，兼容直接事件、slack_event 包（{ type: 'events_api', body: { event } }）与
  *   按类型监听包（{ event }）。
- * - 排除 subtype 非空的消息、bot 自己发的消息（bot_id 非空，或 user 等于 botUserId）。
+ * - message 允许无 subtype、thread_broadcast 与 file_share，继续排除其他 subtype（如 bot_message、channel_join、message_changed）。
+ * - 排除 bot 自己发的消息（bot_id 非空，或 user 等于非空 botUserId）。
+ * - 保留 thread_ts、files 摘要，并在 app_mention 时标记 event_type；纯文件分享无文本时合成可读占位文本。
  */
 export declare function parseMessageEvent(raw: unknown, botUserId?: string): InboxMessage | null;

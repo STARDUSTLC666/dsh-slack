@@ -59,6 +59,60 @@ export function resolveDefaultChannel(config: SlackConfig | undefined): string {
   return config?.defaultChannel ?? ''
 }
 
+/** 令牌格式校验结果。 */
+export interface TokenValidationResult {
+  valid: boolean
+  kind: 'bot' | 'user' | 'app' | 'unknown'
+  reason?: string
+}
+
+/**
+ * 校验自定义 Slack Web API 基地址是否为合法的 http/https URL。
+ */
+export function isValidSlackApiUrl(url: string): boolean {
+  if (typeof url !== 'string') return false
+  const trimmed = url.trim()
+  if (trimmed === '') return false
+  try {
+    const parsed = new URL(trimmed)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 校验 Slack Web API 令牌前缀格式（区分 Bot / User / 误填的 App-Level Token / 未知格式）。
+ */
+export function validateTokenFormat(token: string): TokenValidationResult {
+  const trimmed = typeof token === 'string' ? token.trim() : ''
+  if (trimmed === '') {
+    return {
+      valid: false,
+      kind: 'unknown',
+      reason: 'token 为空：请提供 Slack 机器人令牌（xoxb-...）或用户令牌（xoxp-...）。',
+    }
+  }
+  if (trimmed.startsWith('xoxb-') || trimmed.startsWith('xoxe.xoxb-')) {
+    return { valid: true, kind: 'bot' }
+  }
+  if (trimmed.startsWith('xoxp-') || trimmed.startsWith('xoxe.xoxp-')) {
+    return { valid: true, kind: 'user' }
+  }
+  if (trimmed.startsWith('xapp-')) {
+    return {
+      valid: false,
+      kind: 'app',
+      reason: '检测到 App-Level Token（xapp- 开头）：该令牌仅用于 Socket Mode 收件箱，请改填到 appToken（或环境变量 DSH_SLACK_APP_TOKEN），不要填在 token 中；token 需填写机器人令牌（xoxb-...）或用户令牌（xoxp-...）。',
+    }
+  }
+  return {
+    valid: false,
+    kind: 'unknown',
+    reason: '令牌前缀格式无效：token 应以 xoxb-（机器人令牌）、xoxp-（用户令牌）或 xoxe.xoxb- / xoxe.xoxp-（可轮换令牌）开头。',
+  }
+}
+
 /**
  * 要求 token：缺失时抛出带中文指引的错误（供 execute 使用）。
  */
