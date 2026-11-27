@@ -1,5 +1,13 @@
 # 更新记录
 
+## 0.6.1+trigger.1 (2026-11-27)
+
+**本 fork 的改动**（基于上游 0.6.1）：
+
+- **收件箱触发器**：消息进收件箱后 `emit('dsh-slack/inbox', message)`；新增 `src/trigger.ts` 订阅该事件，命中 `app_mention`、`<@botUserId>` 或私信时，按 60 秒合并窗口调用 `ctx.schedule.run({ id: triggerTaskId })` 唤醒一条 paused 的 DSH 定时任务。
+- **新增配置字段**：`botUserId`（判断 @ 是否指向本机器人）、`triggerTaskId`（要唤醒的任务；留空则关闭触发器）。
+- 除上述改动外，工具行为与上游 0.6.1 一致。
+
 ## 0.6.1 (2026-11-26)
 
 - **一键 Slack App Manifest**：新增 `slack-app-manifest.yaml` 并纳入 npm 导出与打包清单，一次性预配全部 9 个工具所需 Bot Scopes、Socket Mode 事件订阅及私信双向交互（`messages_tab_read_only_enabled: false`），同步更新中英文 README、使用说明与详细参考文档。

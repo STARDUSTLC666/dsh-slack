@@ -13,6 +13,10 @@ export interface SlackConfig {
   appToken: string
   /** Slack Web API 基地址；默认官方 https://slack.com/api/。企业网格（Enterprise Grid）与本地协议级测试可覆盖。 */
   slackApiUrl?: string
+  /** 机器人 user id（U...），用于判断 @ 是否指向本机器人。 */
+  botUserId: string
+  /** 收件箱触发器要唤醒的 DSH 定时任务 id；留空则关闭触发器。 */
+  triggerTaskId: string
 }
 
 /** token 的环境变量名。 */
@@ -24,14 +28,16 @@ export const ENV_APP_TOKEN = 'DSH_SLACK_APP_TOKEN'
  * 解析原始配置。永不抛错：非法形状返回 undefined，让插件懒加载不失败。
  */
 export function parseConfig(raw: unknown): SlackConfig | undefined {
-  if (raw === undefined || raw === null) return { token: '', defaultChannel: '', appToken: '' }
+  if (raw === undefined || raw === null) return { token: '', defaultChannel: '', appToken: '', botUserId: '', triggerTaskId: '' }
   if (typeof raw !== 'object' || Array.isArray(raw)) return undefined
   const obj = raw as Record<string, unknown>
   const token = typeof obj.token === 'string' ? obj.token.trim() : ''
   const defaultChannel = typeof obj.defaultChannel === 'string' ? obj.defaultChannel.trim() : ''
   const appToken = typeof obj.appToken === 'string' ? obj.appToken.trim() : ''
   const slackApiUrl = typeof obj.slackApiUrl === 'string' && obj.slackApiUrl.trim() !== '' ? obj.slackApiUrl.trim() : undefined
-  return { token, defaultChannel, appToken, ...(slackApiUrl !== undefined ? { slackApiUrl } : {}) }
+  const botUserId = typeof obj.botUserId === 'string' ? obj.botUserId.trim() : ''
+  const triggerTaskId = typeof obj.triggerTaskId === 'string' ? obj.triggerTaskId.trim() : ''
+  return { token, defaultChannel, appToken, botUserId, triggerTaskId, ...(slackApiUrl !== undefined ? { slackApiUrl } : {}) }
 }
 
 /**

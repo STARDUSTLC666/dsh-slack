@@ -1,7 +1,7 @@
 {
   "name": "dsh-slack",
-  "version": "0.6.1",
-  "description": "DeepSeek Harness Slack 集成插件：原生 Markdown 通知、线程回复、频道历史与线程读取、文件上传、表情回应、Socket Mode 双向收件箱、代理适配与在线健康诊断。欢迎提交 issues 和 PR。",
+  "version": "0.6.1+trigger.1",
+  "description": "dsh-slack 的 fork：在原有 Slack 工具之上增加收件箱触发器，命中 @ / 私信时唤醒 DSH 定时任务 (fork of dsh-slack with an inbox trigger)",
   "type": "module",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
@@ -55,13 +55,13 @@
     "typescript": "^5.7.3"
   },
   "repository": {
-    "url": "git+https://github.com/STARDUSTLC666/dsh-slack.git",
-    "type": "git"
+    "type": "git",
+    "url": "git+https://github.com/itstartstosnow/dsh-slack-fork-trigger.git"
   },
   "bugs": {
-    "url": "https://github.com/STARDUSTLC666/dsh-slack/issues"
+    "url": "https://github.com/itstartstosnow/dsh-slack-fork-trigger/issues"
   },
-  "homepage": "https://github.com/STARDUSTLC666/dsh-slack#readme",
+  "homepage": "https://github.com/itstartstosnow/dsh-slack-fork-trigger#readme",
   "author": "stardustlc",
   "keywords": [
     "dsh-plugin",

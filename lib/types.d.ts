@@ -29,7 +29,11 @@ export interface SlackContext {
     };
     /** Cordis 生命周期：传入启动函数，其返回的清理函数在 dispose 时执行。 */
     effect?: (start: () => void | (() => void), label?: string) => void;
-    on?: (event: 'dispose', listener: () => void) => unknown;
+    on?: (event: string, listener: (...args: never[]) => void) => unknown;
+    /** 向宿主事件总线发事件（存在时才会发，用于 `dsh-slack/inbox`）。 */
+    emit?: (event: string, ...args: unknown[]) => unknown;
+    /** 读取宿主服务（可选；触发器用它拿 `schedule`）。 */
+    get?: (name: string) => unknown;
     /** 可选日志器；缺省回退 console.warn。 */
     logger?: {
         warn(message: string, ...args: unknown[]): void;

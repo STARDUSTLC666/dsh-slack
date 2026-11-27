@@ -1,2 +1,4 @@
 node_modules/
 *.tsbuildinfo
+.npm-cache/
+package-lock.json
