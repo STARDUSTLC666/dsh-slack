@@ -67,6 +67,25 @@ For the web profile, replace `desktop` with `web`. Restart DSH once after instal
 | `slack_inbox` stays empty | Missing `xapp-` token, Socket Mode off, or missing events / `app_mentions:read` | Import `slack-app-manifest.yaml` (recommended), or enable Socket Mode, subscribe to `message.*` / `app_mention` with matching `*:history` / `app_mentions:read` scopes, set `appToken`, and reload |
 | `invalid_auth` / `missing_scope` | Token revoked or missing required scopes (error message names exact missing scope) | Add the listed scopes in Slack App settings, click **Reinstall to Workspace**, update `token`, and verify with `slack_health(verify=true)` |
 
+## Inbox trigger (optional)
+
+The inbox alone never wakes the agent. With `triggerTaskId` set, the plugin delivers an existing DSH schedule task as soon as a mention, an `app_mention` event, or a DM arrives, so the agent in that session can answer; with no messages there are no turns.
+
+```yaml
+- id: slack
+  config:
+    token: 'xoxb-...'
+    appToken: 'xapp-...'
+    botUserId: 'U0XXXXXXX'
+    triggerTaskId: 'schedule-...'
+```
+
+- `botUserId`: the bot's user id (from `auth.test` or `slack_health`), used to tell whether a mention targets this bot;
+- `triggerTaskId`: the task to wake. Keep it paused — the trigger delivers it. Leave empty to disable;
+- Messages arriving within the same 60-second window are coalesced into one wake-up.
+
+Requires the host's `schedule` service; without it the plugin only logs a warning. The inbox stays in memory, so unread messages are lost on restart.
+
 ## Plugin updates
 
 Check updates at the bottom of native plugin details. Automatic checks are on by default; **automatic installation is off**. Suite-managed components update with their bundle.

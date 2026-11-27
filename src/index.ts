@@ -30,6 +30,7 @@ import {
 } from './tools.js'
 import { createInboxQueue } from './inbox.js'
 import { startSocketModeClient, type SocketDisposer } from './socket.js'
+import { installInboxTrigger, INBOX_EVENT } from './trigger.js'
 import { inspectProxyEnv } from './transport.js'
 import type { SlackContext } from './types.js'
 
@@ -188,6 +189,11 @@ export function apply(ctx: SlackContext, rawConfig: unknown): void {
   let socketActive = false
   let socketDisposed = false
   let resolvedBotUserId: string | undefined
+  installInboxTrigger(ctx, {
+    taskId: () => readConfig()?.triggerTaskId ?? '',
+    botUserId: () => readConfig()?.botUserId || resolvedBotUserId,
+    warn,
+  })
   let resolvedBotUserIdFingerprint = ''
   let authAbort: AbortController | undefined
   let botIdRefreshInFlightFingerprint = ''
@@ -303,6 +309,7 @@ export function apply(ctx: SlackContext, rawConfig: unknown): void {
           const activeSocket = startSocketModeClient(appToken, {
             onMessage(message) {
               inboxQueue.push(message)
+              ctx.emit?.(INBOX_EVENT, message)
             },
           }, warn, {
             ...(validApiUrl !== undefined ? { slackApiUrl: validApiUrl } : {}),

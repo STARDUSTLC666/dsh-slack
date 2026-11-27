@@ -1,5 +1,9 @@
 # 更新记录
 
+## Unreleased
+
+- **收件箱触发器（可选）**：消息进收件箱后发出 `dsh-slack/inbox` 事件；新增独立模块 `src/trigger.ts` 订阅该事件，命中 `app_mention`、正文中的 `<@botUserId>` 或私信时，按 60 秒合并窗口调用 `ctx.schedule.run({ id: triggerTaskId })`，唤醒一条已存在的 DSH 定时任务。新增 `botUserId`、`triggerTaskId` 两个配置字段；`triggerTaskId` 留空时不安装触发器，行为与之前完全一致。
+
 ## 0.6.1 (2026-11-26)
 
 - **一键 Slack App Manifest**：新增 `slack-app-manifest.yaml` 并纳入 npm 导出与打包清单，一次性预配全部 9 个工具所需 Bot Scopes、Socket Mode 事件订阅及私信双向交互（`messages_tab_read_only_enabled: false`），同步更新中英文 README、使用说明与详细参考文档。
