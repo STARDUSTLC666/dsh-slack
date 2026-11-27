@@ -61,9 +61,10 @@ function createConnectProxyFixture(t, targetHandler) {
 }
 
 test('parseConfig 处理缺失/空配置（不抛错）', () => {
-  assert.deepEqual(parseConfig(undefined), { token: '', defaultChannel: '', appToken: '' })
-  assert.deepEqual(parseConfig(null), { token: '', defaultChannel: '', appToken: '' })
-  assert.deepEqual(parseConfig({}), { token: '', defaultChannel: '', appToken: '' })
+  const empty = { token: '', defaultChannel: '', appToken: '', botUserId: '', triggerTaskId: '' }
+  assert.deepEqual(parseConfig(undefined), empty)
+  assert.deepEqual(parseConfig(null), empty)
+  assert.deepEqual(parseConfig({}), empty)
 })
 
 test('parseConfig 非法形状返回 undefined', () => {
