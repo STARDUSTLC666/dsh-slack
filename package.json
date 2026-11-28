@@ -1,6 +1,6 @@
 {
   "name": "dsh-slack",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "DeepSeek Harness Slack 集成插件：原生 Markdown 通知、线程回复、频道历史与线程读取、文件上传、表情回应、Socket Mode 双向收件箱、代理适配与在线健康诊断。欢迎提交 issues 和 PR。",
   "type": "module",
   "main": "./lib/index.js",
