@@ -502,6 +502,10 @@ export const Config: HostSchemaNode<Partial<SlackConfig>> = z.object<Partial<Sla
     .description('Socket Mode 收件箱 App-Level Token（可选，xapp-...）；留空时回退环境变量 DSH_SLACK_APP_TOKEN'),
   defaultChannel: z.string().volatile()
     .description('默认目标频道（如 #general 或频道 ID，省略 channel 参数时自动回退使用，可选，保存即生效）'),
+  botUserId: z.string().volatile()
+    .description('机器人 user id（可选，U...；用于判断 @ 是否指向本机器人）'),
+  triggerTaskId: z.string().volatile()
+    .description('收件箱触发器要唤醒的 DSH 定时任务 id（可选，留空则关闭触发器）'),
   slackApiUrl: z.string().volatile()
     .description('自定义 Slack Web API 基地址（可选，默认 https://slack.com/api/）'),
 }).i18n({
@@ -511,6 +515,8 @@ export const Config: HostSchemaNode<Partial<SlackConfig>> = z.object<Partial<Sla
     appToken: 'App-Level Token（可选，xapp-...，开启 Socket Mode 收消息时填写；留空时读取 DSH_SLACK_APP_TOKEN）',
     defaultChannel: '默认频道（如 #general 或频道 ID，调用通知或上传工具省略 channel 时自动回退使用，保存即生效）',
     slackApiUrl: 'Slack Web API 基地址（可选，默认官方 https://slack.com/api/，企业网格可覆盖）',
+    botUserId: '机器人 user id（可选，U...；用于判断 @ 是否指向本机器人）',
+    triggerTaskId: '收件箱触发器要唤醒的 DSH 定时任务 id（可选，留空则关闭触发器）',
   },
   en: {
     $description: 'Slack integration settings: channel notifications, thread replies, channel/history/thread queries, file uploads, emoji reactions, health checks, and optional Socket Mode inbox',
@@ -518,6 +524,8 @@ export const Config: HostSchemaNode<Partial<SlackConfig>> = z.object<Partial<Sla
     appToken: 'Optional App-Level Token (xapp-...) for Socket Mode incoming inbox; falls back to DSH_SLACK_APP_TOKEN',
     defaultChannel: 'Default target channel (e.g. #general or channel ID; used automatically when channel is omitted; applies live)',
     slackApiUrl: 'Optional custom Slack Web API base URL (defaults to https://slack.com/api/)',
+    botUserId: 'Bot user id (optional, U...; used to tell whether a mention targets this bot)',
+    triggerTaskId: 'Schedule task id the inbox trigger wakes (optional; empty disables the trigger)',
   },
 })
 

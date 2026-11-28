@@ -66,6 +66,26 @@ dsh plugin --profile desktop add dsh-slack
 | `slack_inbox` 一直为空 | 未配 `xapp-` 令牌、未开 Socket Mode、漏订事件或漏配 `app_mentions:read` | 推荐直接导入 `slack-app-manifest.yaml`；手动配置需开启 Socket Mode、订阅 `message.*` / `app_mention` 并补齐对应 `*:history` / `app_mentions:read` 权限，填好 `appToken` 后重载 |
 | `invalid_auth` / `missing_scope` | 令牌失效或缺少所需权限（报错会直接列出缺失 scope） | 在 Slack 后台补勾报错提示的权限并 Reinstall to Workspace，然后更新 `token`，用 `slack_health(verify=true)` 复核 |
 
+## 收件箱触发器（可选）
+
+收件箱本身不会主动叫醒 agent。填上 `triggerTaskId` 后，插件在收到 @ 机器人的消息、`app_mention` 事件或私信时，会立刻投递一条已存在的 DSH 定时任务，让那个会话里的 agent 来处理；没有消息时不产生回合。
+
+```yaml
+- id: slack
+  name: dsh-slack
+  config:
+    token: 'xoxb-...'
+    appToken: 'xapp-...'
+    botUserId: 'U0XXXXXXX'
+    triggerTaskId: 'schedule-...'
+```
+
+- `botUserId`：机器人 user id（`auth.test` 或 `slack_health` 能看到），用来判断 @ 是否指向它；
+- `triggerTaskId` 填已有任务的 ID，留空关闭唤醒。任务可以保持暂停。
+- 第一条符合条件的消息会立即请求唤醒。接下来的 60 秒内若收到更多消息，会在窗口结束时合并投递一次。修改目标任务或卸载插件会丢弃旧任务待投递的唤醒。
+
+依赖宿主的 `schedule` 服务；没有该服务时只记一条 warn，不影响其余工具。收件箱本身仍在内存里，重启前的未处理消息会丢。
+
 ## 插件更新
 
 在原生插件详情页底部检查更新。默认自动检查，**默认不自动安装**；是否安装、何时重启由你决定。Suite 管理的组件随整包更新。

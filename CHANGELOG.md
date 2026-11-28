@@ -1,5 +1,9 @@
 # 更新记录
 
+## Unreleased
+
+- Socket Mode 收到私信或对机器人的提及时，可通过 `triggerTaskId` 唤醒已有 DSH 定时任务。每条连接在 60 秒内合并后续唤醒，卸载或修改目标时取消原任务的待投递请求。
+
 ## 0.6.1 (2026-11-26)
 
 - **一键 Slack App Manifest**：新增 `slack-app-manifest.yaml` 并纳入 npm 导出与打包清单，一次性预配全部 9 个工具所需 Bot Scopes、Socket Mode 事件订阅及私信双向交互（`messages_tab_read_only_enabled: false`），同步更新中英文 README、使用说明与详细参考文档。

@@ -305,8 +305,11 @@ test('resolvedBotUserId 在首次离线失败后随 Socket Mode 连接自动恢�
     appToken: 'xapp-1-local-test',
     defaultChannel: '#general',
     slackApiUrl: apiUrl,
+    triggerTaskId: 'inbox-task',
   })
   const ctx = mockContext()
+  const wakes = []
+  ctx.get = name => name === 'schedule' ? { run: ({ id }) => wakes.push(id) } : undefined
   t.after(async () => {
     ctx.dispose()
     const deadline = Date.now() + 1000
@@ -339,12 +342,14 @@ test('resolvedBotUserId 在首次离线失败后随 Socket Mode 连接自动恢�
     envelope_id: 'env-2',
     type: 'events_api',
     accepts_response_payload: false,
-    payload: { event: { type: 'message', channel: 'C001', user: 'UHUMAN', ts: '1700.2', text: 'human hi' } },
+    payload: { event: { type: 'message', channel: 'C001', user: 'UHUMAN', ts: '1700.2', text: '<@UBOT1> hi' } },
   })))
 
   await waitFor(async () => (await inbox.execute({ markRead: false })).messages.length >= 1)
   const firstRead = await inbox.execute({ markRead: true })
   assert.deepEqual(firstRead.messages.map((m) => m.user), ['UHUMAN'])
+  await waitFor(() => wakes.length > 0)
+  assert.deepEqual(wakes, ['inbox-task'])
 
   // 通过 volatile 热更新 token -> 触发新 auth.test 刷新为 UBOT2
   const writeSym = Symbol.for('cosmokit.volatile.write')

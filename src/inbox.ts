@@ -49,7 +49,7 @@ export class InboxQueue {
   }
 
   /** 追加一条消息；按 Slack 规范标识 (channel, ts) 去重，重复到达时合并升级未读项元数据，超过容量时丢弃最旧。 */
-  push(message: InboxMessage): void {
+  push(message: InboxMessage): InboxMessage | undefined {
     const key = this.key(message)
     if (this.seen.has(key)) {
       const existing = this.items.find((item) => this.key(item) === key)
@@ -64,7 +64,8 @@ export class InboxQueue {
           existing.files = message.files.map((file) => ({ ...file }))
         }
       }
-      return
+      // A retried envelope can enrich an unread row, but cannot revive a drained one.
+      return existing
     }
     this.seen.add(key)
     while (this.seen.size > Math.max(200, this.capacity * 4)) this.seen.delete(this.seen.values().next().value!)
@@ -76,6 +77,7 @@ export class InboxQueue {
     if (this.items.length > this.capacity) {
       this.items.splice(0, this.items.length - this.capacity)
     }
+    return stored
   }
 
   /** 返回最近 limit 条消息（新的在前）。 */

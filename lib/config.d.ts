@@ -12,6 +12,10 @@ export interface SlackConfig {
     appToken: string;
     /** Slack Web API 基地址；默认官方 https://slack.com/api/。企业网格（Enterprise Grid）与本地协议级测试可覆盖。 */
     slackApiUrl?: string;
+    /** 机器人 user id（U...），用于判断 @ 是否指向本机器人。 */
+    botUserId?: string;
+    /** 收件箱触发器要唤醒的 DSH 定时任务 id；留空则关闭触发器。 */
+    triggerTaskId?: string;
 }
 /** token 的环境变量名。 */
 export declare const ENV_TOKEN = "DSH_SLACK_TOKEN";

@@ -30,6 +30,7 @@ import {
 } from './tools.js'
 import { createInboxQueue } from './inbox.js'
 import { startSocketModeClient, type SocketDisposer } from './socket.js'
+import { createInboxTrigger } from './trigger.js'
 import { inspectProxyEnv } from './transport.js'
 import type { SlackContext } from './types.js'
 
@@ -255,7 +256,9 @@ export function apply(ctx: SlackContext, rawConfig: unknown): void {
   }
 
   const botUserIdProvider = (): string | undefined => {
-    const fp = configFingerprint(readConfig())
+    const current = readConfig()
+    if (current?.botUserId) return current.botUserId
+    const fp = configFingerprint(current)
     if (resolvedBotUserIdFingerprint !== '' && resolvedBotUserIdFingerprint !== fp) {
       resolvedBotUserId = undefined
       resolvedBotUserIdFingerprint = ''
@@ -299,10 +302,12 @@ export function apply(ctx: SlackContext, rawConfig: unknown): void {
 
         socketDisposed = false
         socketActive = true
+        const trigger = createInboxTrigger(ctx, () => readConfig()?.triggerTaskId ?? '', botUserIdProvider, warn)
         try {
           const activeSocket = startSocketModeClient(appToken, {
             onMessage(message) {
-              inboxQueue.push(message)
+              const unread = inboxQueue.push(message)
+              if (unread) trigger.onMessage(unread)
             },
           }, warn, {
             ...(validApiUrl !== undefined ? { slackApiUrl: validApiUrl } : {}),
@@ -318,12 +323,14 @@ export function apply(ctx: SlackContext, rawConfig: unknown): void {
           return () => {
             socketDisposed = true
             socketActive = false
+            trigger.dispose()
             authAbort?.abort()
             authAbort = undefined
             botIdRefreshInFlightFingerprint = ''
             activeSocket()
           }
         } catch (error) {
+          trigger.dispose()
           socketActive = false
           authAbort?.abort()
           authAbort = undefined
